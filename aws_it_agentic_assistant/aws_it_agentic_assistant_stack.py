@@ -23,6 +23,8 @@ class AwsItAgenticAssistantStack(Stack):
             secret_name="claude_api_key"
         )
 
+        #TODO: Implement Postgres Status Table
+
         # LAMBDAS
         intake_context_lambda = _lambda.DockerImageFunction(
             self, "IntakeContextLambda",

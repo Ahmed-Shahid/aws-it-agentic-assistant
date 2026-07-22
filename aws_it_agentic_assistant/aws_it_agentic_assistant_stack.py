@@ -96,9 +96,14 @@ class AwsItAgenticAssistantStack(Stack):
         STEP FUNCTIONS: TASKS
         '''
         intake_context_task = None
-        ticketing_task = None
+        initialize_ticketing_task = None
         issue_resolution_preapr_task = None
+        update_ticket_proposed_resolution_task = None
+        request_approval_task = None
+        mark_approval_task = None
+        mark_rejection_task = None
         issue_resolution_postapr_task = None
+        close_ticket_task = None
 
         '''
         STEP FUNCTIONS: STATE MACHINE

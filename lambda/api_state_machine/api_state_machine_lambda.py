@@ -11,6 +11,9 @@ sfn = boto3.client("stepfunctions")
 STATE_MACHINE_ARN = os.environ.get("STATE_MACHINE_ARN")
 
 #TODO: Add "Get Status" function to retrieve the status of a job from DynamoDB or another storage solution
+def get_status(job_id: str):
+    return {'status': 'queued', 'task_token': 'dummy_task_token', 'job_id': job_id}  # Placeholder implementation
+
 
 @app.post("/start-query")
 async def start_query(payload: dict):

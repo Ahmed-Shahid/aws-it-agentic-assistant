@@ -14,6 +14,8 @@ STATE_MACHINE_ARN = os.environ.get("STATE_MACHINE_ARN")
 def get_status(job_id: str):
     return {'status': 'queued', 'task_token': 'dummy_task_token', 'job_id': job_id}  # Placeholder implementation
 
+#Test comment
+
 
 @app.post("/start-query")
 async def start_query(payload: dict):

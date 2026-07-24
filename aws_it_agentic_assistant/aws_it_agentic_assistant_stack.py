@@ -137,7 +137,7 @@ class AwsItAgenticAssistantStack(Stack):
                 "input.$": "$"
             }),
             output_path="$.Payload",
-            timeout=Duration.days(5)
+            task_timeout=sfn.Timeout.duration(Duration.days(7))
         )
 
         mark_approval_task = tasks.LambdaInvoke(
@@ -198,7 +198,7 @@ class AwsItAgenticAssistantStack(Stack):
         )
         state_machine = sfn.StateMachine(
             self, "ITAgenticAssistantWorkflow",
-            definition=sfn.DefinitionBody.from_chainable(state_machine_definition),
+            definition_body=sfn.DefinitionBody.from_chainable(state_machine_definition),
             timeout=Duration.days(7)
         )
 

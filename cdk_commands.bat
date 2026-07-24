@@ -8,3 +8,7 @@ aws login
 cdk bootstrap --ca-bundle-path /path/to/your/certificate.pem
 cdk synth
 cdk destroy
+
+aws configure list
+aws configure set profile default
+cdk diff --profile default --ca-bundle-path /path/to/your/certificate.pem

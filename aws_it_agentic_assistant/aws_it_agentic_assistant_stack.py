@@ -9,13 +9,17 @@ from aws_cdk import (
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
     aws_iam as iam,
+    aws_dynamodb as dynamodb,
+    aws_ec2 as ec2,
+    aws_rds as rds,
+    RemovalPolicy
 )
 
 class AwsItAgenticAssistantStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-
+ 
         '''
         SECRETS
         '''
@@ -30,9 +34,46 @@ class AwsItAgenticAssistantStack(Stack):
         )
 
         '''
-        DATABASE
+        DATABASE - Status Table
         '''
         #TODO: Implement Postgres Status Table
+        status_table = dynamodb.Table(
+            self, "StatusTable",
+            partition_key=dynamodb.Attribute(name="job_id", type=dynamodb.AttributeType.STRING),
+            sort_key=dynamodb.Attribute(name="timestamp", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=RemovalPolicy.DESTROY
+        )
+
+        '''
+        DATABASE - Data Table
+        '''
+        vpc = ec2.Vpc(self, "AgentVpc", max_azs=2, nat_gateways=1)
+
+        db_instance = rds.DatabaseInstance(
+            self,
+            "AgentDatabase",
+            engine=rds.DatabaseInstanceEngine.postgres(version=rds.PostgresEngineVersion.VER_16),
+            instance_type=ec2.InstanceType.of(
+                ec2.InstanceClass.BURSTABLE4_GRAVITON, ec2.InstanceSize.MICRO
+            ),
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
+            database_name="agentdb",
+            credentials=rds.Credentials.from_generated_secret("postgres"),
+            # removal_policy=RemovalPolicy.DESTROY,  # convenient for POC teardown
+        )
+
+        db_proxy = rds.DatabaseProxy(
+            self,
+            "AgentDatabaseProxy",
+            proxy_target=rds.ProxyTarget.from_instance(db_instance),
+            secrets=[db_instance.secret],
+            vpc=vpc,
+        )
+
+        db_lambda_sg = ec2.SecurityGroup(self, "AgentDbLambdaSg", vpc=vpc)
+        db_proxy.connections.allow_default_port_from(db_lambda_sg)
 
         '''
         LAMBDAS

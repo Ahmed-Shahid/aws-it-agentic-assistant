@@ -112,6 +112,8 @@ class AwsItAgenticAssistantStack(Stack):
             }
         )
 
+        #TODO: Consolidate the issue resolution lambdas into a single lambda with a mode parameter
+
         issue_resolution_postapr_lambda = _lambda.DockerImageFunction(
             self, "IssueResolutionPostAprLambda",
             code=_lambda.DockerImageCode.from_image_asset(

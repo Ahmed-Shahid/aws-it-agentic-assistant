@@ -86,18 +86,8 @@ class AwsItAgenticAssistantStack(Stack):
             # removal_policy=RemovalPolicy.DESTROY,  # convenient for POC teardown
         )
 
-        db_proxy = rds.DatabaseProxy(
-            self,
-            "AgentDatabaseProxy",
-            proxy_target=rds.ProxyTarget.from_instance(db_instance),
-            secrets=[db_instance.secret],
-            vpc=vpc,
-            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
-        )
-
         db_lambda_sg = ec2.SecurityGroup(self, "AgentDbLambdaSg", vpc=vpc)
-        db_proxy.connections.allow_from(db_lambda_sg, ec2.Port.tcp(5432))
-        db_instance.connections.allow_default_port_from(db_proxy)
+        db_instance.connections.allow_default_port_from(db_lambda_sg)
 
         '''
         LAMBDAS
@@ -109,7 +99,7 @@ class AwsItAgenticAssistantStack(Stack):
             ),
             architecture=_lambda.Architecture.ARM_64,
             environment={
-                "DB_PROXY_ENDPOINT": db_proxy.endpoint,
+                "DB_HOST": db_instance.instance_endpoint.hostname,
                 "DB_NAME": "agentdb",
                 "DB_USER": "postgres",
                 "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn
@@ -130,7 +120,7 @@ class AwsItAgenticAssistantStack(Stack):
             security_groups=[db_lambda_sg],
             environment={
                 "CLAUDE_API_KEY_SECRET_ARN": claude_secret.secret_arn,
-                "DB_PROXY_ENDPOINT": db_proxy.endpoint,
+                "DB_HOST": db_instance.instance_endpoint.hostname,
                 "DB_NAME": "agentdb",
                 "DB_USER": "postgres",
                 "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn,
@@ -148,7 +138,7 @@ class AwsItAgenticAssistantStack(Stack):
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[db_lambda_sg],
             environment={
-                "DB_PROXY_ENDPOINT": db_proxy.endpoint,
+                "DB_HOST": db_instance.instance_endpoint.hostname,
                 "DB_NAME": "agentdb",
                 "DB_USER": "postgres",
                 "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn,
@@ -180,7 +170,7 @@ class AwsItAgenticAssistantStack(Stack):
             security_groups=[db_lambda_sg],
             environment={
                 "CLAUDE_API_KEY_SECRET_ARN": claude_secret.secret_arn,
-                "DB_PROXY_ENDPOINT": db_proxy.endpoint,
+                "DB_HOST": db_instance.instance_endpoint.hostname,
                 "DB_NAME": "agentdb",
                 "DB_USER": "postgres",
                 "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn,

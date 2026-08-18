@@ -17,7 +17,7 @@ import boto3
 from psycopg_pool import ConnectionPool
 from pgvector.psycopg import register_vector
 
-_DB_PROXY_ENDPOINT = os.environ["DB_PROXY_ENDPOINT"]
+_DB_HOST = os.environ["DB_HOST"]
 _DB_NAME = os.environ["DB_NAME"]
 _DB_SECRET_ARN = os.environ["DB_SECRET_ARN"]
 

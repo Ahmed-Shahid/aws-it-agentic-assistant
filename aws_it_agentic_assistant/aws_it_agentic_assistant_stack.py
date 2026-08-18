@@ -78,6 +78,22 @@ class AwsItAgenticAssistantStack(Stack):
         '''
         LAMBDAS
         '''
+        data_seeder_lambda = _lambda.DockerImageFunction(
+            self, "DataSeederLambda",
+            code=_lambda.DockerImageCode.from_image_asset(
+                directory="lambda/data_seeder"
+            ),
+            architecture=_lambda.Architecture.ARM_64,
+            environment={
+                "DB_PROXY_ENDPOINT": db_proxy.endpoint,
+                "DB_NAME": "agentdb",
+                "DB_USER": "postgres",
+                "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn
+            },
+            vpc=vpc,
+            security_groups=[db_lambda_sg]
+        )
+
         intake_context_lambda = _lambda.DockerImageFunction(
             self, "IntakeContextLambda",
             code=_lambda.DockerImageCode.from_image_asset(
@@ -138,6 +154,12 @@ class AwsItAgenticAssistantStack(Stack):
         '''
         STEP FUNCTIONS: TASKS
         '''
+        seed_data_task = tasks.LambdaInvoke(
+            self, "SeedDataTask",
+            lambda_function=data_seeder_lambda,
+            output_path="$.Payload"
+        )
+
         intake_context_task = tasks.LambdaInvoke(
             self, "IntakeContextTask",
             lambda_function=intake_context_lambda,
@@ -232,7 +254,8 @@ class AwsItAgenticAssistantStack(Stack):
             mark_rejection_task.next(close_ticket_task)
         )
         state_machine_definition = (
-            intake_context_task
+            seed_data_task
+            .next(intake_context_task)
             .next(initialize_ticketing_task)
             .next(issue_resolution_preapr_task)
             .next(update_ticket_proposed_resolution_task)

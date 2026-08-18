@@ -19,3 +19,7 @@ venv.bak/
 # CDK Context & Staging files
 .cdk.staging/
 cdk.out/
+
+# Other
+sample_code/
+sample_data/

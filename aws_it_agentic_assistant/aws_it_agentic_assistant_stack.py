@@ -96,7 +96,7 @@ class AwsItAgenticAssistantStack(Stack):
         )
 
         db_lambda_sg = ec2.SecurityGroup(self, "AgentDbLambdaSg", vpc=vpc)
-        db_proxy.connections.allow_default_port_from(db_lambda_sg)
+        db_proxy.connections.allow_from(db_lambda_sg, ec2.Port.tcp(5432))
         db_instance.connections.allow_default_port_from(db_proxy)
 
         '''
@@ -333,7 +333,7 @@ class AwsItAgenticAssistantStack(Stack):
         state_machine = sfn.StateMachine(
             self, "ITAgenticAssistantWorkflow",
             definition_body=sfn.DefinitionBody.from_chainable(state_machine_definition),
-            timeout=Duration.days(7, hours=6) # Adding headroom on top of the 7-day task timeout for approval
+            timeout=Duration.days(8) # Adding headroom on top of the 7-day task timeout for approval
         )
 
         '''

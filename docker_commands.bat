@@ -10,4 +10,7 @@ docker build -t issue_resolution .
 cd ..\ticketing
 docker build -t ticketing .
 
+cd ..\upload_document
+docker build -t upload_document .
+
 cd ..\..

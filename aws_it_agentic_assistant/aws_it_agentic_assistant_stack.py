@@ -4,7 +4,6 @@ from aws_cdk import (
     Stack,
     CfnOutput,
     aws_lambda as _lambda,
-    aws_lambda_event_sources as lambda_event_sources,
     aws_secretsmanager as secretsmanager,
     aws_stepfunctions as sfn,
     aws_stepfunctions_tasks as tasks,
@@ -36,11 +35,9 @@ class AwsItAgenticAssistantStack(Stack):
         '''
         DATABASE - Status Table
         '''
-        #TODO: Implement Postgres Status Table
         status_table = dynamodb.Table(
             self, "StatusTable",
             partition_key=dynamodb.Attribute(name="job_id", type=dynamodb.AttributeType.STRING),
-            sort_key=dynamodb.Attribute(name="timestamp", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
             removal_policy=RemovalPolicy.DESTROY
         )
@@ -48,7 +45,32 @@ class AwsItAgenticAssistantStack(Stack):
         '''
         DATABASE - Data Table
         '''
-        vpc = ec2.Vpc(self, "AgentVpc", max_azs=2, nat_gateways=1)
+        vpc = ec2.Vpc(
+            self,
+            "AgentVpc",
+            max_azs=2,
+            nat_gateways=1,
+            subnet_configuration=[
+                # Holds the NAT Gateway; nothing else needs to live here.
+                ec2.SubnetConfiguration(
+                    name="Public", subnet_type=ec2.SubnetType.PUBLIC, cidr_mask=24
+                ),
+                # langgraph_agent_fn and postapproval_fn: need NAT (internet)
+                # for Anthropic/Bedrock/Secrets Manager, so PRIVATE_WITH_EGRESS.
+                ec2.SubnetConfiguration(
+                    name="PrivateWithEgress",
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    cidr_mask=24,
+                ),
+                # RDS instance + RDS Proxy: no internet access needed or
+                # wanted, so a real PRIVATE_ISOLATED group has to exist.
+                ec2.SubnetConfiguration(
+                    name="PrivateIsolated",
+                    subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+                    cidr_mask=24,
+                ),
+            ],
+        )
 
         db_instance = rds.DatabaseInstance(
             self,
@@ -70,10 +92,12 @@ class AwsItAgenticAssistantStack(Stack):
             proxy_target=rds.ProxyTarget.from_instance(db_instance),
             secrets=[db_instance.secret],
             vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
         )
 
         db_lambda_sg = ec2.SecurityGroup(self, "AgentDbLambdaSg", vpc=vpc)
         db_proxy.connections.allow_default_port_from(db_lambda_sg)
+        db_instance.connections.allow_default_port_from(db_proxy)
 
         '''
         LAMBDAS
@@ -91,6 +115,7 @@ class AwsItAgenticAssistantStack(Stack):
                 "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn
             },
             vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[db_lambda_sg]
         )
 
@@ -100,8 +125,34 @@ class AwsItAgenticAssistantStack(Stack):
                 directory="lambda/intake_context"
             ),
             architecture=_lambda.Architecture.ARM_64,
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[db_lambda_sg],
             environment={
-                "CLAUDE_API_KEY_SECRET_ARN": claude_secret.secret_arn
+                "CLAUDE_API_KEY_SECRET_ARN": claude_secret.secret_arn,
+                "DB_PROXY_ENDPOINT": db_proxy.endpoint,
+                "DB_NAME": "agentdb",
+                "DB_USER": "postgres",
+                "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn,
+                "STATUS_TABLE_NAME": status_table.table_name
+            }
+        )
+
+        upload_document_lambda = _lambda.DockerImageFunction(
+            self, "UploadDocumentLambda",
+            code=_lambda.DockerImageCode.from_image_asset(
+                directory="lambda/upload_document"
+            ),
+            architecture=_lambda.Architecture.ARM_64,
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[db_lambda_sg],
+            environment={
+                "DB_PROXY_ENDPOINT": db_proxy.endpoint,
+                "DB_NAME": "agentdb",
+                "DB_USER": "postgres",
+                "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn,
+                "STATUS_TABLE_NAME": status_table.table_name
             }
         )
 
@@ -113,7 +164,8 @@ class AwsItAgenticAssistantStack(Stack):
             architecture=_lambda.Architecture.ARM_64,
             environment={
                 "CLAUDE_API_KEY_SECRET_ARN": claude_secret.secret_arn,
-                "JIRA_TOKEN_SECRET_ARN": jira_secret.secret_arn
+                "JIRA_TOKEN_SECRET_ARN": jira_secret.secret_arn,
+                "STATUS_TABLE_NAME": status_table.table_name
             }
         )
 
@@ -123,8 +175,16 @@ class AwsItAgenticAssistantStack(Stack):
                 directory="lambda/issue_resolution"
             ),
             architecture=_lambda.Architecture.ARM_64,
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[db_lambda_sg],
             environment={
-                "CLAUDE_API_KEY_SECRET_ARN": claude_secret.secret_arn
+                "CLAUDE_API_KEY_SECRET_ARN": claude_secret.secret_arn,
+                "DB_PROXY_ENDPOINT": db_proxy.endpoint,
+                "DB_NAME": "agentdb",
+                "DB_USER": "postgres",
+                "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn,
+                "STATUS_TABLE_NAME": status_table.table_name
             }
         )
 
@@ -136,17 +196,14 @@ class AwsItAgenticAssistantStack(Stack):
             architecture=_lambda.Architecture.ARM_64,
             memory_size=256,
             timeout=Duration.seconds(30),
+            environment={
+                "STATUS_TABLE_NAME": status_table.table_name
+            }
         )
 
         '''
         STEP FUNCTIONS: TASKS
         '''
-        seed_data_task = tasks.LambdaInvoke(
-            self, "SeedDataTask",
-            lambda_function=data_seeder_lambda,
-            output_path="$.Payload"
-        )
-
         intake_context_task = tasks.LambdaInvoke(
             self, "IntakeContextTask",
             lambda_function=intake_context_lambda,
@@ -163,11 +220,20 @@ class AwsItAgenticAssistantStack(Stack):
             output_path="$.Payload"
         )
 
-        #TODO: Add payload to distinguish pre-approval and post-approval tasks, if needed
+        upload_document_task = tasks.LambdaInvoke(
+            self, "UploadDocumentTask",
+            lambda_function=upload_document_lambda,
+            payload=sfn.TaskInput.from_object({
+                "action": "upload",
+                "input.$": "$"
+            }),
+            output_path="$.Payload"
+        )
 
         issue_resolution_preapr_task = tasks.LambdaInvoke(
             self, "IssueResolutionPreApprovalTask",
             lambda_function=issue_resolution_lambda,
+            payload=sfn.TaskInput.from_object({"action": "propose", "input.$": "$"}),
             output_path="$.Payload"
         )
 
@@ -214,11 +280,10 @@ class AwsItAgenticAssistantStack(Stack):
             output_path="$.Payload"
         )
 
-        #TODO: Add payload to distinguish pre-approval and post-approval tasks, if needed
-
         issue_resolution_postapr_task = tasks.LambdaInvoke(
             self, "IssueResolutionPostApprovalTask",
             lambda_function=issue_resolution_lambda,
+            payload=sfn.TaskInput.from_object({"action": "apply", "input.$": "$"}),
             output_path="$.Payload"
         )
 
@@ -244,27 +309,46 @@ class AwsItAgenticAssistantStack(Stack):
             sfn.Condition.string_equals("$.approval_status", "rejected"), 
             mark_rejection_task.next(close_ticket_task)
         )
-        state_machine_definition = (
-            seed_data_task
-            .next(intake_context_task)
-            .next(initialize_ticketing_task)
+
+        intake_choice = sfn.Choice(self, "IntakeChoice")
+        intake_choice.when(
+            sfn.Condition.string_equals("$.classification", "upload"),
+            upload_document_task
+        )
+        intake_choice.otherwise(
+            initialize_ticketing_task
             .next(issue_resolution_preapr_task)
             .next(update_ticket_proposed_resolution_task)
             .next(request_approval_task)
             .next(approval_choice)
         )
+
+        request_approval_task.add_catch(
+            mark_rejection_task,
+            errors=["States.Timeout"],
+            result_path="$.error",
+        )
+        
+        state_machine_definition = intake_context_task.next(intake_choice)
         state_machine = sfn.StateMachine(
             self, "ITAgenticAssistantWorkflow",
             definition_body=sfn.DefinitionBody.from_chainable(state_machine_definition),
-            timeout=Duration.days(7)
+            timeout=Duration.days(7, hours=6) # Adding headroom on top of the 7-day task timeout for approval
         )
 
         '''
         GRANTS AND ADDITIONAL SETUP
         '''
-        #TODO: Add status table grants
+        status_table.grant_read_write_data(intake_context_lambda)
+        status_table.grant_read_write_data(upload_document_lambda)
+        status_table.grant_read_write_data(issue_resolution_lambda)
+        status_table.grant_read_write_data(ticketing_lambda)
+        status_table.grant_read_write_data(api_state_machine_lambda)
+        
         jira_secret.grant_read(ticketing_lambda)
         claude_secret.grant_read(intake_context_lambda)
+        claude_secret.grant_read(issue_resolution_lambda)
+        claude_secret.grant_read(ticketing_lambda) # TODO: May remove later if ticketing_lambda doesn't need to call Claude directly
 
         api_url = api_state_machine_lambda.add_function_url(
             auth_type=_lambda.FunctionUrlAuthType.AWS_IAM,
@@ -280,3 +364,16 @@ class AwsItAgenticAssistantStack(Stack):
         )
         state_machine.grant_start_execution(api_state_machine_lambda)
         api_state_machine_lambda.add_environment("STATE_MACHINE_ARN", state_machine.state_machine_arn)
+
+        db_instance.secret.grant_read(data_seeder_lambda)
+        db_instance.secret.grant_read(intake_context_lambda)
+        db_instance.secret.grant_read(upload_document_lambda)
+        db_instance.secret.grant_read(issue_resolution_lambda)
+
+        bedrock_embed_policy = iam.PolicyStatement(
+            actions=["bedrock:InvokeModel"],
+            resources=[f"arn:aws:bedrock:{self.region}::foundation-model/amazon.titan-embed-text-v2:0"],
+        )
+        data_seeder_lambda.add_to_role_policy(bedrock_embed_policy)
+        intake_context_lambda.add_to_role_policy(bedrock_embed_policy)
+        upload_document_lambda.add_to_role_policy(bedrock_embed_policy)

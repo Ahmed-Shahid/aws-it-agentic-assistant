@@ -3,5 +3,5 @@ def handler(event, context):
     # Process the event here
     return {
         'statusCode': 200,
-        'body': 'Hello from Lambda!'
+        'body': 'Hello from Intake ContextLambda!'
     }

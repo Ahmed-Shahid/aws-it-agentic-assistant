@@ -117,23 +117,10 @@ class AwsItAgenticAssistantStack(Stack):
             }
         )
 
-        issue_resolution_preapr_lambda = _lambda.DockerImageFunction(
-            self, "IssueResolutionPreAprLambda",
+        issue_resolution_lambda = _lambda.DockerImageFunction(
+            self, "IssueResolutionLambda",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory="lambda/issue_resolution_preapr"
-            ),
-            architecture=_lambda.Architecture.ARM_64,
-            environment={
-                "CLAUDE_API_KEY_SECRET_ARN": claude_secret.secret_arn
-            }
-        )
-
-        #TODO: Consolidate the issue resolution lambdas into a single lambda with a mode parameter
-
-        issue_resolution_postapr_lambda = _lambda.DockerImageFunction(
-            self, "IssueResolutionPostAprLambda",
-            code=_lambda.DockerImageCode.from_image_asset(
-                directory="lambda/issue_resolution_postapr"
+                directory="lambda/issue_resolution"
             ),
             architecture=_lambda.Architecture.ARM_64,
             environment={
@@ -176,9 +163,11 @@ class AwsItAgenticAssistantStack(Stack):
             output_path="$.Payload"
         )
 
+        #TODO: Add payload to distinguish pre-approval and post-approval tasks, if needed
+
         issue_resolution_preapr_task = tasks.LambdaInvoke(
             self, "IssueResolutionPreApprovalTask",
-            lambda_function=issue_resolution_preapr_lambda,
+            lambda_function=issue_resolution_lambda,
             output_path="$.Payload"
         )
 
@@ -225,9 +214,11 @@ class AwsItAgenticAssistantStack(Stack):
             output_path="$.Payload"
         )
 
+        #TODO: Add payload to distinguish pre-approval and post-approval tasks, if needed
+
         issue_resolution_postapr_task = tasks.LambdaInvoke(
             self, "IssueResolutionPostApprovalTask",
-            lambda_function=issue_resolution_postapr_lambda,
+            lambda_function=issue_resolution_lambda,
             output_path="$.Payload"
         )
 

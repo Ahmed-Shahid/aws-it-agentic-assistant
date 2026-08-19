@@ -95,7 +95,8 @@ class AwsItAgenticAssistantStack(Stack):
         data_seeder_lambda = _lambda.DockerImageFunction(
             self, "DataSeederLambda",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory="lambda/data_seeder"
+                directory=".",
+                file="lambda/data_seeder/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
             environment={
@@ -112,7 +113,8 @@ class AwsItAgenticAssistantStack(Stack):
         intake_context_lambda = _lambda.DockerImageFunction(
             self, "IntakeContextLambda",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory="lambda/intake_context"
+                directory=".",
+                file="lambda/intake_context/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
             vpc=vpc,
@@ -131,7 +133,8 @@ class AwsItAgenticAssistantStack(Stack):
         upload_document_lambda = _lambda.DockerImageFunction(
             self, "UploadDocumentLambda",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory="lambda/upload_document"
+                directory=".",
+                file="lambda/upload_document/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
             vpc=vpc,
@@ -149,7 +152,8 @@ class AwsItAgenticAssistantStack(Stack):
         ticketing_lambda = _lambda.DockerImageFunction(
             self, "TicketingLambda",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory="lambda/ticketing"
+                directory=".",
+                file="lambda/ticketing/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
             environment={
@@ -162,7 +166,8 @@ class AwsItAgenticAssistantStack(Stack):
         issue_resolution_lambda = _lambda.DockerImageFunction(
             self, "IssueResolutionLambda",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory="lambda/issue_resolution"
+                directory=".",
+                file="lambda/issue_resolution/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
             vpc=vpc,
@@ -181,7 +186,8 @@ class AwsItAgenticAssistantStack(Stack):
         api_state_machine_lambda = _lambda.DockerImageFunction(
             self, "ApiStateMachineLambda",
             code=_lambda.DockerImageCode.from_image_asset(
-                directory="lambda/api_state_machine"
+                directory=".",
+                file="lambda/api_state_machine/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
             memory_size=256,

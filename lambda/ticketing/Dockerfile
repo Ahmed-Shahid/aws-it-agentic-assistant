@@ -1,8 +1,9 @@
 FROM public.ecr.aws/lambda/python:3.14
 
-COPY requirements.txt .
+COPY lambda/ticketing/requirements.txt .
 RUN pip install -r requirements.txt --no-cache-dir
 
-COPY . ${LAMBDA_TASK_ROOT}
+COPY common/ ${LAMBDA_TASK_ROOT}/common
+COPY lambda/ticketing ${LAMBDA_TASK_ROOT}
 
 CMD ["ticketing_lambda.handler"]

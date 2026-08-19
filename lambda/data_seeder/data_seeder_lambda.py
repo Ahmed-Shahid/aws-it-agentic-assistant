@@ -1,12 +1,13 @@
-def handler(event, context):
-    print("Received event: " + str(event))
-    # Process the event here
-    return {
-        'statusCode': 200,
-        'body': 'Hello from Data Seeder Lambda!'
-    }
+from common.db import execute_query
 
 sql = """
+DROP TABLE IF EXISTS action_requests;
+DROP TABLE IF EXISTS devices;
+DROP TABLE IF EXISTS iam_accounts;
+DROP TABLE IF EXISTS runbook_rules;
+DROP TABLE IF EXISTS service_tickets;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS vpn_profiles;
 CREATE TABLE action_requests (request_id TEXT PRIMARY KEY, user_id TEXT, action_type TEXT, requested_at TEXT, confirmation_status TEXT, execution_status TEXT, evidence_ref TEXT);
 INSERT INTO "action_requests" VALUES('AR1001','U7002','Unlock Account','2025-04-10T09:05:00Z','Pending','Not Started','runbook_account_lockout#step_4');
 INSERT INTO "action_requests" VALUES('AR1002','U7004','VPN Re-enable','2025-04-10T08:02:00Z','Pending','Blocked - Compliance Check','runbook_vpn_access#step_3');
@@ -38,3 +39,12 @@ INSERT INTO "vpn_profiles" VALUES('U7002','Enabled','Corp-Standard','2025-04-09T
 INSERT INTO "vpn_profiles" VALUES('U7003','Enabled','Corp-Restricted','2025-04-10T07:15:00Z','Valid','Pass');
 INSERT INTO "vpn_profiles" VALUES('U7004','Denied','Corp-Standard','2025-04-08T19:30:00Z','Expired','Fail');
 """
+
+def handler(event, context):
+    print("Received event: " + str(event))
+    # Process the event here
+    execute_query(sql)
+    return {
+        'statusCode': 200,
+        'body': 'Hello from Data Seeder Lambda!'
+    }

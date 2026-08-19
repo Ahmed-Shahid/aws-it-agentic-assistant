@@ -75,3 +75,10 @@ def similarity_search(embedding: list, top_k: int = 5, table: str = "documents")
             (embedding, embedding, top_k),
         )
         return [{"id": r[0], "content": r[1], "similarity": r[2]} for r in cur.fetchall()]
+
+def execute_query(query: str, params: tuple = ()) -> list:
+    """Executes a SQL query and returns the results as a list of dictionaries."""
+    with get_cursor() as cur:
+        cur.execute(query, params)
+        columns = [desc[0] for desc in cur.description]
+        return [dict(zip(columns, row)) for row in cur.fetchall()]

@@ -5,4 +5,4 @@ RUN pip install -r requirements.txt --no-cache-dir
 
 COPY . ${LAMBDA_TASK_ROOT}
 
-CMD ["api_state_machine_lambda.handler"]
+CMD ["data_seeder_lambda.handler"]

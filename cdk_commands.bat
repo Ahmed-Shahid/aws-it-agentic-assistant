@@ -16,3 +16,5 @@ cdk diff --profile default --ca-bundle-path /path/to/your/certificate.pem
 
 @REM Seed data
 aws lambda invoke --function-name DataSeederLambda --payload '{}' out.json
+
+rm -rf cdk.out

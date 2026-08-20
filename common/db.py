@@ -84,5 +84,7 @@ def execute_query(query: str, params: tuple = None) -> list:
     """Executes a SQL query and returns the results as a list of dictionaries."""
     with get_cursor() as cur:
         cur.execute(query, params)
-        columns = [desc[0] for desc in cur.description]
-        return [dict(zip(columns, row)) for row in cur.fetchall()]
+        if cur.description:
+            columns = [desc[0] for desc in cur.description]
+            return [dict(zip(columns, row)) for row in cur.fetchall()]
+    return []

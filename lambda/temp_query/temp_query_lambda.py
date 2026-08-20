@@ -6,8 +6,9 @@ def handler(event, context):
     print("Received event: " + str(event))
     # Process the event here
     sql = event.get('sql', '')
-    execute_query(sql)
+    result = execute_query(sql)
     return {
         'statusCode': 200,
-        'body': 'Hello from Temp Query Lambda!'
+        'body': 'Hello from Temp Query Lambda!',
+        'result': result
     }

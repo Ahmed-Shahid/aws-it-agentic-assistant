@@ -110,6 +110,24 @@ class AwsItAgenticAssistantStack(Stack):
             security_groups=[db_lambda_sg]
         )
 
+        temp_query_lambda = _lambda.DockerImageFunction(
+            self, "TempQueryLambda",
+            code=_lambda.DockerImageCode.from_image_asset(
+                directory=".",
+                file="lambda/temp_query/Dockerfile"
+            ),
+            architecture=_lambda.Architecture.ARM_64,
+            environment={
+                "DB_HOST": db_instance.instance_endpoint.hostname,
+                "DB_NAME": "agentdb",
+                "DB_USER": "postgres",
+                "DB_PASSWORD_SECRET_ARN": db_instance.secret.secret_arn
+            },
+            vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            security_groups=[db_lambda_sg]
+        )
+
         intake_context_lambda = _lambda.DockerImageFunction(
             self, "IntakeContextLambda",
             code=_lambda.DockerImageCode.from_image_asset(
@@ -365,6 +383,7 @@ class AwsItAgenticAssistantStack(Stack):
         db_instance.secret.grant_read(intake_context_lambda)
         db_instance.secret.grant_read(upload_document_lambda)
         db_instance.secret.grant_read(issue_resolution_lambda)
+        db_instance.secret.grant_read(temp_query_lambda)
 
         bedrock_embed_policy = iam.PolicyStatement(
             actions=["bedrock:InvokeModel"],

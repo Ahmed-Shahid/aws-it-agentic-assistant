@@ -19,7 +19,8 @@ from pgvector.psycopg import register_vector
 
 _DB_HOST = os.environ["DB_HOST"]
 _DB_NAME = os.environ["DB_NAME"]
-_DB_SECRET_ARN = os.environ["DB_SECRET_ARN"]
+_DB_USER = os.environ["DB_USER"]
+_DB_SECRET_ARN = os.environ["DB_PASSWORD_SECRET_ARN"]
 
 _secrets_client = boto3.client("secretsmanager")
 
@@ -28,7 +29,7 @@ def _build_conninfo() -> str:
     secret = json.loads(_secrets_client.get_secret_value(SecretId=_DB_SECRET_ARN)["SecretString"])
     return (
         f"host={_DB_HOST} port=5432 dbname={_DB_NAME} "
-        f"user={secret['username']} password={secret['password']}"
+        f"user={_DB_USER} password={secret['password']}"
     )
 
 

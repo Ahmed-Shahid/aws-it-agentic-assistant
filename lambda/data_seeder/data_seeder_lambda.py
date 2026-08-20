@@ -1,6 +1,6 @@
 from common.db import execute_query
 
-sql = """
+db_sql = """
 DROP TABLE IF EXISTS action_requests;
 DROP TABLE IF EXISTS devices;
 DROP TABLE IF EXISTS iam_accounts;
@@ -40,9 +40,30 @@ INSERT INTO "vpn_profiles" VALUES('U7003','Enabled','Corp-Restricted','2025-04-1
 INSERT INTO "vpn_profiles" VALUES('U7004','Denied','Corp-Standard','2025-04-08T19:30:00Z','Expired','Fail');
 """
 
+vector_sql = """
+DROP TABLE IF EXISTS documents;
+CREATE TABLE documents (document_id TEXT PRIMARY KEY, title TEXT, content TEXT, embedding vector(1024));
+"""
+
+single_table_sql = """
+CREATE TABLE action_requests (request_id TEXT PRIMARY KEY, user_id TEXT, action_type TEXT, requested_at TEXT, confirmation_status TEXT, execution_status TEXT, evidence_ref TEXT);
+"""
+
 def handler(event, context):
     print("Received event: " + str(event))
     # Process the event here
+    query_type = event.get('query_type', 'db_sql')
+    if query_type == 'db_sql':
+        sql = db_sql
+    elif query_type == 'vector_sql':
+        sql = vector_sql
+    elif query_type == 'single_table_sql':
+        sql = single_table_sql
+    else:
+        return {
+            'statusCode': 400,
+            'body': f'Invalid query_type: {query_type}'
+        }
     execute_query(sql)
     return {
         'statusCode': 200,

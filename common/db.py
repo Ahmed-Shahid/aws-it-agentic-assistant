@@ -27,7 +27,7 @@ _secrets_client = boto3.client("secretsmanager")
 def _build_conninfo() -> str:
     secret = json.loads(_secrets_client.get_secret_value(SecretId=_DB_SECRET_ARN)["SecretString"])
     return (
-        f"host={_DB_PROXY_ENDPOINT} port=5432 dbname={_DB_NAME} "
+        f"host={_DB_HOST} port=5432 dbname={_DB_NAME} "
         f"user={secret['username']} password={secret['password']}"
     )
 

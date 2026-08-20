@@ -41,6 +41,7 @@ INSERT INTO "vpn_profiles" VALUES('U7004','Denied','Corp-Standard','2025-04-08T1
 """
 
 vector_sql = """
+CREATE EXTENSION IF NOT EXISTS vector;
 DROP TABLE IF EXISTS documents;
 CREATE TABLE documents (document_id TEXT PRIMARY KEY, title TEXT, content TEXT, embedding vector(1024));
 """

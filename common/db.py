@@ -36,7 +36,10 @@ def _build_conninfo() -> str:
 def _configure(conn):
     # Lets psycopg adapt Python lists <-> pgvector's `vector` column type
     # directly, so callers can pass embeddings as plain lists of floats.
-    register_vector(conn)
+    try:
+        register_vector(conn)
+    except Exception as e:
+        print(f"pgvector adapter not registered (extension may not exist yet): {e}")
 
 
 # Built once per container (cold start), reused across warm invocations --
@@ -77,7 +80,7 @@ def similarity_search(embedding: list, top_k: int = 5, table: str = "documents")
         )
         return [{"id": r[0], "content": r[1], "similarity": r[2]} for r in cur.fetchall()]
 
-def execute_query(query: str, params: tuple = ()) -> list:
+def execute_query(query: str, params: tuple = None) -> list:
     """Executes a SQL query and returns the results as a list of dictionaries."""
     with get_cursor() as cur:
         cur.execute(query, params)

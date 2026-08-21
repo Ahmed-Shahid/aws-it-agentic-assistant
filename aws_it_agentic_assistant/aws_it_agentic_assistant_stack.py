@@ -231,7 +231,10 @@ class AwsItAgenticAssistantStack(Stack):
             lambda_function=ticketing_lambda,
             payload=sfn.TaskInput.from_object({
                 "action": "initialize",
-                "input.$": "$"
+                "job_id.$": "$.job_id",
+                "classification.$": "$.classification",
+                "raw_input.$": "$.raw_input",
+                "retrieved_chunks.$": "$.retrieved_chunks",
             }),
             output_path="$.Payload"
         )
@@ -249,7 +252,9 @@ class AwsItAgenticAssistantStack(Stack):
         issue_resolution_preapr_task = tasks.LambdaInvoke(
             self, "IssueResolutionPreApprovalTask",
             lambda_function=issue_resolution_lambda,
-            payload=sfn.TaskInput.from_object({"action": "propose", "input.$": "$"}),
+            payload=sfn.TaskInput.from_object({
+                "action": "propose", "input.$": "$"
+            }),
             output_path="$.Payload"
         )
 

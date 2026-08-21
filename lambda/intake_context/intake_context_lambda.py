@@ -7,9 +7,10 @@ from pydantic import BaseModel
 from anthropic import Anthropic
 import os
 
+from common.secrets import get_secret
+
 _CLAUDE_SECRET_ARN = os.environ["CLAUDE_API_KEY_SECRET_ARN"]
-_secrets_client = boto3.client("secretsmanager")
-client = Anthropic(api_key=json.loads(_secrets_client.get_secret_value(SecretId=_CLAUDE_SECRET_ARN)["SecretString"]))
+client = Anthropic(api_key=get_secret(secret_arn=_CLAUDE_SECRET_ARN))
 
 class ActionClassification(BaseModel):
     action: str
@@ -34,7 +35,7 @@ def handler(event, context):
         raw_input=input_data,
         retrieved_chunks=processed_input.get('retrieved_chunks', [])
     )
-    return response
+    return response.model_dump()
 
 def get_rag_chunks(input_data: str):
     # Placeholder for the function to get RAG chunks

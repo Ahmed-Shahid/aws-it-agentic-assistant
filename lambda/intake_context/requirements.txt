@@ -1,5 +1,6 @@
 annotated-doc==0.0.4
 annotated-types==0.8.0
+anthropic==0.109.1
 anyio==4.14.2
 attrs==26.1.0
 aws-cdk-lib==2.261.0

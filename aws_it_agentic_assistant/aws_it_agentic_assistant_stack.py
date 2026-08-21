@@ -224,6 +224,8 @@ class AwsItAgenticAssistantStack(Stack):
             output_path="$.Payload"
         )
 
+        #TODO: Remove hardcoded actions because they are now being returned from the lambdas?
+
         initialize_ticketing_task = tasks.LambdaInvoke(
             self, "InitializeTicketingTask",
             lambda_function=ticketing_lambda,
@@ -326,7 +328,7 @@ class AwsItAgenticAssistantStack(Stack):
 
         intake_choice = sfn.Choice(self, "IntakeChoice")
         intake_choice.when(
-            sfn.Condition.string_equals("$.classification", "upload"),
+            sfn.Condition.string_equals("$.action", "upload"),
             upload_document_task
         )
         intake_choice.otherwise(

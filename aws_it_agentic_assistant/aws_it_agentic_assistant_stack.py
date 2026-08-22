@@ -262,8 +262,8 @@ class AwsItAgenticAssistantStack(Stack):
             self, "UpdateTicketProposedResolutionTask",
             lambda_function=ticketing_lambda,
             payload=sfn.TaskInput.from_object({
-                "action": "update_proposed_resolution",
-                "input.$": "$"
+                "action": "update",
+                "proposed_resolution.$": "$.proposed_resolution",
             }),
             output_path="$.Payload"
         )

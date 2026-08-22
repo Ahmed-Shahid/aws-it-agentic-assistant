@@ -264,6 +264,8 @@ class AwsItAgenticAssistantStack(Stack):
             payload=sfn.TaskInput.from_object({
                 "action": "update",
                 "proposed_resolution.$": "$.proposed_resolution",
+                "ticket_id.$": "$.ticket_id",
+                "job_id.$": "$.job_id",
             }),
             output_path="$.Payload"
         )

@@ -5,6 +5,7 @@ from typing import TypedDict, Optional
 from atlassian import Jira
 
 from common.models import IntakeContextResponse, ClaudeAIModels
+from common.status import update_status, get_status
 from pydantic import BaseModel
 from anthropic import Anthropic
 import os
@@ -13,7 +14,7 @@ from common.secrets import get_secret
 
 _CLAUDE_SECRET_ARN = os.environ["CLAUDE_API_KEY_SECRET_ARN"]
 _JIRA_SECRET_ARN = os.environ["JIRA_TOKEN_SECRET_ARN"]
-client = Anthropic(api_key=get_secret(secret_arn=_CLAUDE_SECRET_ARN))
+client = Anthropic(api_key=get_secret(secret_arn=_CLAUDE_SECRET_ARN, secret_key="api_key"))
 
 class TicketDetailResponse(BaseModel):
     title: Optional[str]
@@ -22,13 +23,15 @@ class TicketDetailResponse(BaseModel):
 class AgentState(TypedDict, total=False):
     job_id: str
     action: str
-    classification: str
-    raw_input: str
+    classification: Optional[str]
+    raw_input: Optional[str]
     retrieved_chunks: Optional[list]
     ticket_id: Optional[str]
     title: Optional[str]
     summary: Optional[str]
     proposed_resolution: Optional[str]
+    approved: Optional[bool]
+    token: Optional[str]
 
 class AgentAction(Enum):
     INITIALIZE = "initialize"
@@ -41,10 +44,11 @@ class AgentAction(Enum):
 """
 HELPER FUNCTIONS
 """
-def add_ticket_comment(state: AgentState):
-    # Placeholder for adding a comment to a ticket
-    print(f"Adding comment to ticket with state: {state}")
-    return {"ticket_id": "TICKET-12345", "status": "comment added"}
+def load_state_from_job_id(job_id: str) -> dict:
+    # Placeholder for loading state from a job ID
+    print(f"Loading state for job ID: {job_id}")
+    status_record = get_status(job_id)
+    return status_record.get("current_state", {}) if status_record else {}
 
 def get_tools():
     return [{
@@ -121,44 +125,86 @@ def retrieve_ticket(state: AgentState):
     return {"ticket_id": "TICKET-12345", "status": "retrieved"}
 
 def update_ticket(state: AgentState):
-    # Placeholder for ticket update logic
     print(f"Updating ticket with state: {state}")
-    return {"ticket_id": "TICKET-12345", "status": "updated"}
+    jira = initialize_jira()
+    ticket = jira.issue_add_comment(
+        issue_key=state.get('ticket_id',''),
+        comment=f"Proposed Resolution:\n{state.get('proposed_resolution', 'No proposed resolution provided.')}"
+    )
+    return {"ticket_id": ticket["key"], "action": "request_approval"}
 
 def move_to_proposal(state: AgentState):
-    # Placeholder for moving ticket to proposal state
     print(f"Moving ticket to proposal with state: {state}")
     return {"action": "propose"}
 
 def move_to_pending_approval(state: AgentState):
     # Placeholder for moving ticket to pending approval
     print(f"Moving ticket to pending approval with state: {state}")
-    return {"ticket_id": "TICKET-12345", "status": "pending approval"}
+    jira = initialize_jira()
+    jira.issue_transition(
+        issue_key=state.get('ticket_id',''),
+        status={"name": "In Review"}
+    )
+    return {}
 
 def request_approval(state: AgentState):
     # Placeholder for requesting approval for a ticket
     print(f"Requesting approval for ticket with state: {state}")
-    return {"ticket_id": "TICKET-12345", "status": "approval requested"}
+    return {"action": "waiting_for_approval"}
 
 def mark_ticket_approved(state: AgentState):
-    # Placeholder for marking ticket as approved
     print(f"Marking ticket as approved with state: {state}")
-    return {"ticket_id": "TICKET-12345", "status": "approved"}
+    loaded_state = load_state_from_job_id(state.get("job_id", "unknown"))
+    print(f"Loaded state from job ID: {loaded_state}")
+    jira = initialize_jira()
+    jira.issue_add_comment(
+        issue_key=loaded_state.get('ticket_id',''),
+        comment=f"Ticket approved via link."
+    )
+    jira.issue_transition(
+        issue_key=loaded_state.get('ticket_id',''),
+        status={"name": "In Progress"}
+    )
+    return {"ticket_id": loaded_state.get('ticket_id',''), "action": "approved"}
 
 def mark_ticket_rejected(state: AgentState):
-    # Placeholder for marking ticket as rejected
     print(f"Marking ticket as rejected with state: {state}")
-    return {"ticket_id": "TICKET-12345", "status": "rejected"}
+    loaded_state = load_state_from_job_id(state.get("job_id", "unknown"))
+    print(f"Loaded state from job ID: {loaded_state}")
+    jira = initialize_jira()
+    jira.issue_add_comment(
+        issue_key=loaded_state.get('ticket_id',''),
+        comment=f"Ticket rejected via link."
+    )
+    old_title = jira.issue_field_value(
+        key=loaded_state.get('ticket_id',''),
+        field="summary"
+    )
+    jira.update_issue_field(
+        key=loaded_state.get('ticket_id',''),
+        fields={"summary": f"[REJECTED] {old_title}"}
+    )
+    return {"ticket_id": loaded_state.get('ticket_id',''), "action": "rejected"}
 
 def resolve_ticket(state: AgentState):
-    # Placeholder for resolving a ticket
     print(f"Resolving ticket with state: {state}")
-    return {"ticket_id": "TICKET-12345", "status": "resolved"}
+    loaded_state = load_state_from_job_id(state.get("job_id", "unknown"))
+    print(f"Loaded state from job ID: {loaded_state}")
+    jira = initialize_jira()
+    jira.issue_add_comment(
+        issue_key=loaded_state.get('ticket_id',''),
+        comment=f"Issue resolution complete. Ticket resolved."
+    )
+    return {"ticket_id": loaded_state.get('ticket_id',''), "action": "resolved"}
 
 def close_ticket(state: AgentState):
-    # Placeholder for closing a ticket
     print(f"Closing ticket with state: {state}")
-    return {"ticket_id": "TICKET-12345", "status": "closed"}
+    jira = initialize_jira()
+    jira.issue_transition(
+        issue_key=state.get('ticket_id',''),
+        status={"name": "Done"}
+    )
+    return {"action": "closed"}
 
 graph = StateGraph(AgentState)
 
@@ -167,7 +213,6 @@ graph.add_node("create_ticket", create_ticket)
 graph.add_node("get_ticket_creation_details", get_ticket_creation_details)
 graph.add_node("retrieve_ticket", retrieve_ticket)
 graph.add_node("update_ticket", update_ticket)
-graph.add_node("add_ticket_comment", add_ticket_comment)
 graph.add_node("move_to_proposal", move_to_proposal)
 graph.add_node("request_approval", request_approval)
 graph.add_node("move_to_pending_approval", move_to_pending_approval)
@@ -220,6 +265,7 @@ def handler(event, context):
         "raw_input": event.get("raw_input", ""),
         "retrieved_chunks": event.get("retrieved_chunks", []),
         "proposed_resolution": event.get("proposed_resolution", None),
+        "token": event.get("token", None),
     }
 
     try:
@@ -232,8 +278,15 @@ def handler(event, context):
             'state': state,
         }
 
+    update_status(
+        job_id=state.get("job_id", "unknown"),
+        status=state.get("action", "unknown"),
+        current_lambda="ticketing_lambda",
+        current_state=state
+    )
+
     return {
         'statusCode': 200,
         'body': str(result),
-        'action': state['action'],
+        'action': state.get("action", "unknown"),
     }

@@ -387,6 +387,7 @@ class AwsItAgenticAssistantStack(Stack):
         )
         state_machine.grant_start_execution(api_state_machine_lambda)
         api_state_machine_lambda.add_environment("STATE_MACHINE_ARN", state_machine.state_machine_arn)
+        ticketing_lambda.add_environment("APPROVAL_BASE_URL", api_url.url)
 
         db_instance.secret.grant_read(data_seeder_lambda)
         db_instance.secret.grant_read(intake_context_lambda)

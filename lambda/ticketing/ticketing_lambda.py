@@ -14,6 +14,7 @@ from common.secrets import get_secret
 
 _CLAUDE_SECRET_ARN = os.environ["CLAUDE_API_KEY_SECRET_ARN"]
 _JIRA_SECRET_ARN = os.environ["JIRA_TOKEN_SECRET_ARN"]
+_APPROVAL_BASE_URL = os.environ["APPROVAL_BASE_URL"]
 client = Anthropic(api_key=get_secret(secret_arn=_CLAUDE_SECRET_ARN, secret_key="api_key"))
 
 class TicketDetailResponse(BaseModel):
@@ -40,6 +41,8 @@ class AgentAction(Enum):
     APPROVE = "approve"
     REJECT = "reject"
     RESOLVE = "resolve"
+    CLOSE = "close"
+    UNKNOWN = "unknown"
 
 """
 HELPER FUNCTIONS
@@ -79,8 +82,10 @@ def initialize_jira():
 NODES
 """
 def route_action(state: AgentState):
-    action = state.get('action', 'unknown')
-    return {'action': action}
+    return {}
+
+def action_router(state: AgentState) -> str:
+    return state.get("action", "unknown")
 
 def create_ticket(state: AgentState):
     print(f"Creating ticket with state: {state}")
@@ -94,8 +99,6 @@ def create_ticket(state: AgentState):
                                        ),
                        'project': {'key': 'KAN'},
                        'issuetype': {'name': 'Task'}})
-
-    jira.issue_add_comment
     return {"ticket_id": ticket["key"]}
 
 def get_ticket_creation_details(state: AgentState):
@@ -109,8 +112,8 @@ def get_ticket_creation_details(state: AgentState):
             messages = [
                 {
                     "role": "user",
-                    "content": (f"raw_input: {state.get('raw_input', '')}"
-                                f"classification: {state.get('classification', '')}"
+                    "content": (f"raw_input: {state.get('raw_input', '')}\n"
+                                f"classification: {state.get('classification', '')}\n"
                                 f"retrieved_chunks: {str(state.get('retrieved_chunks', ''))}")
                 }
             ]
@@ -131,7 +134,7 @@ def update_ticket(state: AgentState):
         issue_key=state.get('ticket_id',''),
         comment=f"Proposed Resolution:\n{state.get('proposed_resolution', 'No proposed resolution provided.')}"
     )
-    return {"ticket_id": ticket["key"], "action": "request_approval"}
+    return {"ticket_id": state.get('ticket_id',''), "action": "request_approval"}
 
 def move_to_proposal(state: AgentState):
     print(f"Moving ticket to proposal with state: {state}")
@@ -143,13 +146,22 @@ def move_to_pending_approval(state: AgentState):
     jira = initialize_jira()
     jira.issue_transition(
         issue_key=state.get('ticket_id',''),
-        status={"name": "In Review"}
+        status="In Review"
     )
     return {}
 
 def request_approval(state: AgentState):
     # Placeholder for requesting approval for a ticket
     print(f"Requesting approval for ticket with state: {state}")
+    loaded_state = load_state_from_job_id(state.get("job_id", "unknown"))
+    print(f"Loaded state from job ID: {loaded_state}")
+    jira = initialize_jira()
+    jira.issue_add_comment(
+        issue_key=loaded_state.get('ticket_id',''),
+        comment=(f"Approval required."
+                 f"Approve: {_APPROVAL_BASE_URL}approve_query/{state["job_id"]}\n"
+                 f"Reject: {_APPROVAL_BASE_URL}reject_query/{state["job_id"]}")
+    )
     return {"action": "waiting_for_approval"}
 
 def mark_ticket_approved(state: AgentState):
@@ -199,12 +211,18 @@ def resolve_ticket(state: AgentState):
 
 def close_ticket(state: AgentState):
     print(f"Closing ticket with state: {state}")
+    ticket_id = (state.get("ticket_id") or
+                    load_state_from_job_id(state.get("job_id", "unknown")).get("ticket_id"))
     jira = initialize_jira()
     jira.issue_transition(
-        issue_key=state.get('ticket_id',''),
-        status={"name": "Done"}
+        issue_key=ticket_id,
+        status="Done"
     )
-    return {"action": "closed"}
+    return {"ticket_id": ticket_id, "action": "closed"}
+
+def unknown_action(state: AgentState):
+    print(f"Unknown action received. State: {state}")
+    return {}
 
 graph = StateGraph(AgentState)
 
@@ -232,13 +250,15 @@ route_action -> retrieve_ticket -> END
 """
 
 graph.set_entry_point("route_action")
-graph.add_conditional_edges("route_action", route_action, {
+graph.add_conditional_edges("route_action", action_router, {
     AgentAction.INITIALIZE.value: "get_ticket_creation_details",
     AgentAction.UPDATE.value: "update_ticket",
     AgentAction.REQUEST_APPROVAL.value: "request_approval",
     AgentAction.APPROVE.value: "mark_ticket_approved",
     AgentAction.REJECT.value: "mark_ticket_rejected",
     AgentAction.RESOLVE.value: "resolve_ticket",
+    AgentAction.CLOSE.value: "close_ticket",
+    AgentAction.UNKNOWN.value: "unknown_action"
 })
 graph.add_edge("get_ticket_creation_details", "create_ticket")
 graph.add_edge("create_ticket", "move_to_proposal")
@@ -268,25 +288,17 @@ def handler(event, context):
         "token": event.get("token", None),
     }
 
-    try:
-        result = app.invoke(state)
-    except Exception as e:
-        print(f"Error invoking state graph: {e}")
-        return {
-            'statusCode': 500,
-            'body': str(e),
-            'state': state,
-        }
+    result = app.invoke(state)
 
     update_status(
         job_id=state.get("job_id", "unknown"),
         status=state.get("action", "unknown"),
         current_lambda="ticketing_lambda",
-        current_state=state
+        current_state=result,
+        task_token=state.get("token", None)
     )
 
     return {
-        'statusCode': 200,
-        'body': str(result),
-        'action': state.get("action", "unknown"),
+        'job_id': state.get("job_id", "unknown"),
+        **result
     }

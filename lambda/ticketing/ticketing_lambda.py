@@ -238,6 +238,7 @@ graph.add_node("mark_ticket_approved", mark_ticket_approved)
 graph.add_node("resolve_ticket", resolve_ticket)
 graph.add_node("mark_ticket_rejected", mark_ticket_rejected)
 graph.add_node("close_ticket", close_ticket)
+graph.add_node("unknown_action", unknown_action)
 
 """
 route_action -> get_ticket_creation_details -> create_ticket -> move_to_proposal -> END

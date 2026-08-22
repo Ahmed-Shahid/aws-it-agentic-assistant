@@ -1,0 +1,10 @@
+{
+    "action": "initialize",
+    "job_id": "ABCD1234",
+    "classification": "password_reset",
+    "raw_input": "I can't login to my account.",
+    "retrieved_chunks": [
+        "Login issues are most likely a password reset issue.",
+        "Take the following steps: 1) Assign the user a temp password in the database, 2) Email the user with the temporary password, 3) Instruct the user to log in with the temporary password and change the password immediately."
+    ]
+}

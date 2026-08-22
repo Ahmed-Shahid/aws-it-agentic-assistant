@@ -1,0 +1,23 @@
+{
+  "version": "2.0",
+  "routeKey": "$default",
+  "rawPath": "/start-query",
+  "rawQueryString": "",
+  "headers": { "content-type": "application/json" },
+  "requestContext": {
+    "http": {
+      "method": "POST",
+      "path": "/start-query",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "test-invoke"
+    },
+    "requestId": "test-request-id",
+    "routeKey": "$default",
+    "stage": "$default",
+    "time": "18/Aug/2026:00:00:00 +0000",
+    "timeEpoch": 0
+  },
+  "body": "{\"summary\": \"test issue\", \"description\": \"test description\"}",
+  "isBase64Encoded": false
+}

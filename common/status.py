@@ -8,6 +8,7 @@ so they all read/write the same job-status shape without duplicating logic.
 import os
 import time
 from typing import Optional
+from models import AgentState
 
 import boto3
 
@@ -31,3 +32,10 @@ def get_status(job_id: str) -> Optional[dict]:
         return None
     resp = _table.get_item(Key={"job_id": job_id})
     return resp.get("Item")
+
+def write_state_to_status(state: AgentState) -> None:
+    """Write the current state to the status table for a given job_id."""
+    job_id = state.get("job_id")
+    if not job_id:
+        raise ValueError("Job ID is required to write state to status.")
+    update_status(job_id, "in_progress", **state)

@@ -2,7 +2,7 @@ import json
 
 import boto3
 
-from common.models import IntakeContextResponse, ClaudeAIModels
+from common.models import IntakeContextResponse, ClaudeAIModels, Classifications
 from pydantic import BaseModel
 from anthropic import Anthropic
 import os
@@ -17,7 +17,7 @@ class ActionClassification(BaseModel):
     classification: str
 
 ACTIONS = ["initialize", "upload"]
-CLASSIFICATIONS = ["password_reset", "iam_account_unlock", "vpn_access_reset", "unknown"]
+CLASSIFICATIONS = list(Classifications)
 
 def handler(event, context):
     print("Received event: " + str(event))

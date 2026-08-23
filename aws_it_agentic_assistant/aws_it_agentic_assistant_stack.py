@@ -271,7 +271,8 @@ class AwsItAgenticAssistantStack(Stack):
             self, "IssueResolutionPreApprovalTask",
             lambda_function=issue_resolution_lambda,
             payload=sfn.TaskInput.from_object({
-                "action": "propose", "input.$": "$"
+                "action": "propose", 
+                "job_id.$": "$.job_id"
             }),
             output_path="$.Payload"
         )

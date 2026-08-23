@@ -4,8 +4,8 @@ from langgraph.graph import StateGraph, END
 from typing import TypedDict, Optional
 from atlassian import Jira
 
-from common.models import IntakeContextResponse, ClaudeAIModels
-from common.status import update_status, get_status
+from common.models import ClaudeAIModels, AgentState,TicketDetailResponse
+from common.status import get_status, write_state_to_status
 from pydantic import BaseModel
 from anthropic import Anthropic
 import os
@@ -16,24 +16,6 @@ _CLAUDE_SECRET_ARN = os.environ["CLAUDE_API_KEY_SECRET_ARN"]
 _JIRA_SECRET_ARN = os.environ["JIRA_TOKEN_SECRET_ARN"]
 _APPROVAL_BASE_URL = os.environ["APPROVAL_BASE_URL"]
 client = Anthropic(api_key=get_secret(secret_arn=_CLAUDE_SECRET_ARN, secret_key="api_key"))
-
-class TicketDetailResponse(BaseModel):
-    title: Optional[str]
-    summary: Optional[str]
-
-class AgentState(TypedDict, total=False):
-    job_id: str
-    user_id: Optional[str]
-    action: str
-    classification: Optional[str]
-    raw_input: Optional[str]
-    retrieved_chunks: Optional[list]
-    ticket_id: Optional[str]
-    title: Optional[str]
-    summary: Optional[str]
-    proposed_resolution: Optional[str]
-    approved: Optional[bool]
-    token: Optional[str]
 
 class AgentAction(Enum):
     INITIALIZE = "initialize"
@@ -94,6 +76,7 @@ def create_ticket(state: AgentState):
     ticket = jira.issue_create({'summary': state.get('title', 'No Title'),
                        'description': (f"DESCRIPTION:\n{state.get('summary', 'No Summary')}"
                                        f"\n\nUSER ID:\n{state.get('user_id', 'unknown')}"
+                                       f"\n\nDEVICE ID:\n{state.get('device_id', 'unknown')}"
                                        f"\n\nCLASSIFICATION:\n{state.get('classification', 'unknown')}"
                                        f"\n\nJOB ID:\n{state.get('job_id', 'unknown')}"
                                        f"\n\nRAW INPUT:\n{state.get('raw_input', '')}"
@@ -284,6 +267,7 @@ def handler(event, context):
     state: AgentState = {
         "job_id": event.get("job_id", "unknown"),
         "user_id": event.get("user_id", "unknown"),
+        "device_id": event.get("device_id", "unknown"),
         "action": event.get("action", "unknown"),
         "classification": event.get("classification", "unknown"),
         "raw_input": event.get("raw_input", ""),
@@ -294,14 +278,7 @@ def handler(event, context):
 
     result = app.invoke(state)
 
-    update_status(
-        job_id=state.get("job_id", "unknown"),
-        status=state.get("action", "unknown"),
-        user_id=state.get("user_id", "unknown"),
-        current_lambda="ticketing_lambda",
-        current_state=result,
-        task_token=state.get("token", None)
-    )
+    write_state_to_status(result)  # Write the updated state to the status table
 
     return {
         'job_id': state.get("job_id", "unknown"),

@@ -34,7 +34,7 @@ async def query_status(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
     return item
 
-@app.post("/approve-query/{job_id}")
+@app.get("/approve-query/{job_id}")
 async def approve(job_id: str):
     item = get_status(job_id)
     if not item:
@@ -46,7 +46,7 @@ async def approve(job_id: str):
     )
     return {"job_id": job_id, "status": "approved"}
 
-@app.post("/reject-query/{job_id}")
+@app.get("/reject-query/{job_id}")
 async def reject(job_id: str):
     item = get_status(job_id)
     if not item:

@@ -7,7 +7,7 @@ from langgraph.graph import StateGraph, END
 from typing import Optional
 from enum import Enum
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 _CLAUDE_SECRET_ARN = os.environ["CLAUDE_API_KEY_SECRET_ARN"]
 client = Anthropic(api_key=get_secret(secret_arn=_CLAUDE_SECRET_ARN, secret_key="api_key"))
@@ -15,6 +15,7 @@ client = Anthropic(api_key=get_secret(secret_arn=_CLAUDE_SECRET_ARN, secret_key=
 class AgentAction(Enum):
     PROPOSE = "propose"
     APPLY = "apply"
+    UNKNOWN = "unknown"
 
 """
 HELPER FUNCTIONS
@@ -23,7 +24,7 @@ def load_state_from_job_id(job_id: str) -> dict:
     # Placeholder for loading state from a job ID
     print(f"Loading state for job ID: {job_id}")
     status_record = get_status(job_id)
-    return status_record.get("current_state", {}) if status_record else {}
+    return status_record
 
 def get_tools():
     return [{
@@ -52,7 +53,8 @@ def retrieve_underlying_data(user_id: str, device_id: str) -> str:
     user_results = execute_query("SELECT * FROM users WHERE user_id = %s", (user_id,))
     iam_results = execute_query("SELECT * FROM iam_accounts WHERE user_id = %s", (user_id,))
     vpn_profile_results = execute_query("SELECT * FROM vpn_profiles WHERE user_id = %s", (user_id,))
-    device_results = execute_query("SELECT * FROM devices WHERE user_id = %s and device_id = %s", (user_id, device_id))
+    device_results = execute_query("SELECT * FROM devices WHERE device_id = %s", (device_id,))
+    device_results += execute_query("SELECT * FROM devices WHERE user_id = %s", (user_id,))
     return (f"User Data: {user_results}, IAM Account Data: {iam_results}, VPN Profile Data: {vpn_profile_results}, Device Data: {device_results}")
 
 #PLACEHOLDER
@@ -92,7 +94,7 @@ def route_to_workflow(state: AgentState):
         raise ValueError("Job ID is required to retrieve status.")
     current_state = load_state_from_job_id(job_id)
     state.update(current_state)
-    state["action"] = "propose"
+    state["action"] = "apply"
     state["resolution_audit_log"] = [get_audit_log_string("Retrieved status and updated state.")]
     return state
 
@@ -100,6 +102,7 @@ def workflow_router(state: AgentState) -> str:
     return state.get("classification", "unknown")
 
 def retrieve_status(state: AgentState):
+    print(f"retrieve_status begin state: {state}")
     job_id = state.get("job_id")
     if not job_id:
         raise ValueError("Job ID is required to retrieve status.")
@@ -107,11 +110,13 @@ def retrieve_status(state: AgentState):
     state.update(current_state)
     state["action"] = "propose"
     state["resolution_audit_log"] = [get_audit_log_string("Retrieved status and updated state.")]
+    print(f"retrieve_status end state: {state}")
     return state
 
 def generate_proposal(state: AgentState):
     # Placeholder for generating a proposal based on the state
     # This could involve calling an AI model or other logic to create a proposal
+    print(f"generate_proposal begin state: {state}")
     audit_log = state.get("resolution_audit_log", [])
     audit_log.append(get_audit_log_string("Retrieving user/device data based on current state."))
     underlying_data = retrieve_underlying_data(state.get("user_id"), state.get("device_id"))
@@ -140,27 +145,45 @@ def generate_proposal(state: AgentState):
     if new_classification and new_classification != state.get("classification"):
         audit_log.append(get_audit_log_string(f"Classification updated from {state.get('classification')} to {new_classification}."))
         state["classification"] = new_classification
-    return {"proposal": result.get("proposal"), "classification": state.get("classification"), "resolution_audit_log": audit_log}
+    print(f"generate_proposal end state: {state}")
+    return {"proposed_resolution": result.get("proposal"), "classification": state.get("classification"), "resolution_audit_log": audit_log}
 
 def password_reset_workflow(state: AgentState):
-    # Placeholder for password reset workflow logic
     print(f"Executing password reset workflow for state: {state}")
-    return state
+    job_id = state.get("job_id")
+    user_id = state.get("user_id")
+    audit_log = state.get("resolution_audit_log", [])
+    audit_log.append(get_audit_log_string(f"Resetting password for user_id: {user_id}"))
+    execute_query("UPDATE iam_accounts SET last_password_change = %s WHERE user_id = %s", (date.today().isoformat(), user_id,))
+    audit_log.append(get_audit_log_string(f"Password reset completed for user_id: {user_id}"))
+    print(f"password_reset_workflow end state: {state}")
+    return {"resolution_audit_log": audit_log, 'action': 'resolve'}
 
 def iam_account_unlock_workflow(state: AgentState):
-    # Placeholder for IAM account unlock workflow logic
     print(f"Executing IAM account unlock workflow for state: {state}")
-    return state
+    job_id = state.get("job_id")
+    user_id = state.get("user_id")
+    audit_log = state.get("resolution_audit_log", [])
+    audit_log.append(get_audit_log_string(f"Unlocking IAM account for user_id: {user_id}"))
+    execute_query("UPDATE iam_accounts SET account_status = 'Active' WHERE user_id = %s", (user_id,))
+    audit_log.append(get_audit_log_string(f"IAM account unlocked for user_id: {user_id}"))
+    print(f"iam_account_unlock_workflow end state: {state}")
+    return {"resolution_audit_log": audit_log, 'action': 'resolve'}
 
 def vpn_access_reset_workflow(state: AgentState):
-    # Placeholder for VPN access reset workflow logic
     print(f"Executing VPN access reset workflow for state: {state}")
-    return state
+    job_id = state.get("job_id")
+    user_id = state.get("user_id")
+    audit_log = state.get("resolution_audit_log", [])
+    audit_log.append(get_audit_log_string(f"Resetting VPN access for user_id: {user_id}"))
+    execute_query("UPDATE vpn_profiles SET vpn_status = 'Enabled', certificate_status = 'Valid', device_compliance = 'Pass' WHERE user_id = %s", (user_id,))
+    audit_log.append(get_audit_log_string(f"VPN access reset completed for user_id: {user_id}"))
+    print(f"vpn_access_reset_workflow end state: {state}")
+    return {"resolution_audit_log": audit_log, 'action': 'resolve'}
 
 def unknown_workflow(state: AgentState):
-    # Placeholder for unknown workflow logic
     print(f"Executing unknown workflow for state: {state}")
-    return state
+    return {}
 
 graph = StateGraph(AgentState)
 
@@ -218,6 +241,7 @@ def handler(event, context):
 
     result = app.invoke(state)
 
+    print(f"issue_resolution lambda final result: {result}")
     write_state_to_status(result)  # Write the updated state to the status table
 
     return {

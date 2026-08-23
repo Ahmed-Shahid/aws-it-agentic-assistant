@@ -34,7 +34,7 @@ def load_state_from_job_id(job_id: str) -> dict:
     # Placeholder for loading state from a job ID
     print(f"Loading state for job ID: {job_id}")
     status_record = get_status(job_id)
-    return status_record.get("current_state", {}) if status_record else {}
+    return status_record
 
 def get_tools():
     return [{
@@ -114,12 +114,17 @@ def retrieve_ticket(state: AgentState):
 
 def update_ticket(state: AgentState):
     print(f"Updating ticket with state: {state}")
+    loaded_state = load_state_from_job_id(state.get("job_id", "unknown"))
+    print(f"Loaded state from job ID: {loaded_state}")
+    state.update(loaded_state)
+    state["action"] = "update"
     jira = initialize_jira()
     ticket = jira.issue_add_comment(
         issue_key=state.get('ticket_id',''),
         comment=f"Proposed Resolution:\n{state.get('proposed_resolution', 'No proposed resolution provided.')}"
     )
-    return {"ticket_id": state.get('ticket_id',''), "action": "request_approval"}
+    state["action"] = "request_approval"
+    return state
 
 def move_to_proposal(state: AgentState):
     print(f"Moving ticket to proposal with state: {state}")
@@ -147,12 +152,16 @@ def request_approval(state: AgentState):
                  f"Approve: {_APPROVAL_BASE_URL}approve_query/{state["job_id"]}\n"
                  f"Reject: {_APPROVAL_BASE_URL}reject_query/{state["job_id"]}")
     )
-    return {"action": "waiting_for_approval"}
+    state.update(loaded_state)
+    state["action"] = "waiting_for_approval"
+    return state
 
 def mark_ticket_approved(state: AgentState):
     print(f"Marking ticket as approved with state: {state}")
     loaded_state = load_state_from_job_id(state.get("job_id", "unknown"))
     print(f"Loaded state from job ID: {loaded_state}")
+    state.update(loaded_state)
+    state["action"] = "apply"
     jira = initialize_jira()
     jira.issue_add_comment(
         issue_key=loaded_state.get('ticket_id',''),
@@ -162,7 +171,7 @@ def mark_ticket_approved(state: AgentState):
         issue_key=loaded_state.get('ticket_id',''),
         status={"name": "In Progress"}
     )
-    return {"ticket_id": loaded_state.get('ticket_id',''), "action": "approved"}
+    return state
 
 def mark_ticket_rejected(state: AgentState):
     print(f"Marking ticket as rejected with state: {state}")
@@ -181,18 +190,26 @@ def mark_ticket_rejected(state: AgentState):
         key=loaded_state.get('ticket_id',''),
         fields={"summary": f"[REJECTED] {old_title}"}
     )
-    return {"ticket_id": loaded_state.get('ticket_id',''), "action": "rejected"}
+    state.update(loaded_state)
+    state["action"] = "rejected"
+    return state
 
 def resolve_ticket(state: AgentState):
     print(f"Resolving ticket with state: {state}")
     loaded_state = load_state_from_job_id(state.get("job_id", "unknown"))
     print(f"Loaded state from job ID: {loaded_state}")
+    state.update(loaded_state)
     jira = initialize_jira()
+    jira.issue_add_comment(
+        issue_key=loaded_state.get('ticket_id',''),
+        comment="\n".join(loaded_state.get('resolution_audit_log', []))
+    )
     jira.issue_add_comment(
         issue_key=loaded_state.get('ticket_id',''),
         comment=f"Issue resolution complete. Ticket resolved."
     )
-    return {"ticket_id": loaded_state.get('ticket_id',''), "action": "resolved"}
+    state["action"] = "resolved"
+    return state
 
 def close_ticket(state: AgentState):
     print(f"Closing ticket with state: {state}")
@@ -203,7 +220,7 @@ def close_ticket(state: AgentState):
         issue_key=ticket_id,
         status="Done"
     )
-    return {"ticket_id": ticket_id, "action": "closed"}
+    return {"action": "closed"}
 
 def unknown_action(state: AgentState):
     print(f"Unknown action received. State: {state}")

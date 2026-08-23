@@ -282,8 +282,6 @@ class AwsItAgenticAssistantStack(Stack):
             lambda_function=ticketing_lambda,
             payload=sfn.TaskInput.from_object({
                 "action": "update",
-                "proposed_resolution.$": "$.proposed_resolution",
-                "ticket_id.$": "$.ticket_id",
                 "job_id.$": "$.job_id",
             }),
             output_path="$.Payload"
@@ -296,7 +294,7 @@ class AwsItAgenticAssistantStack(Stack):
             payload=sfn.TaskInput.from_object({
                 "action": "request_approval",
                 "token": sfn.JsonPath.task_token,
-                "input.$": "$"
+                "job_id.$": "$.job_id"
             }),
             output_path="$.Payload",
             task_timeout=sfn.Timeout.duration(Duration.days(7))
@@ -307,7 +305,7 @@ class AwsItAgenticAssistantStack(Stack):
             lambda_function=ticketing_lambda,
             payload=sfn.TaskInput.from_object({
                 "action": "approve",
-                "input.$": "$"
+                "job_id.$": "$.job_id"
             }),
             output_path="$.Payload"
         )
@@ -317,7 +315,7 @@ class AwsItAgenticAssistantStack(Stack):
             lambda_function=ticketing_lambda,
             payload=sfn.TaskInput.from_object({
                 "action": "reject",
-                "input.$": "$"
+                "job_id.$": "$.job_id"
             }),
             output_path="$.Payload"
         )
@@ -325,7 +323,10 @@ class AwsItAgenticAssistantStack(Stack):
         issue_resolution_postapr_task = tasks.LambdaInvoke(
             self, "IssueResolutionPostApprovalTask",
             lambda_function=issue_resolution_lambda,
-            payload=sfn.TaskInput.from_object({"action": "apply", "input.$": "$"}),
+            payload=sfn.TaskInput.from_object({
+                "action": "apply", 
+                "job_id.$": "$.job_id"
+            }),
             output_path="$.Payload"
         )
 
@@ -333,8 +334,8 @@ class AwsItAgenticAssistantStack(Stack):
             self, "CloseTicketTask",
             lambda_function=ticketing_lambda,
             payload=sfn.TaskInput.from_object({
-                "action": "close",
-                "input.$": "$"
+                "action": "resolve",
+                "job_id.$": "$.job_id"
             }),
             output_path="$.Payload"
         )
@@ -402,7 +403,7 @@ class AwsItAgenticAssistantStack(Stack):
         claude_secret.grant_read(ticketing_lambda) # TODO: May remove later if ticketing_lambda doesn't need to call Claude directly
 
         api_url = api_state_machine_lambda.add_function_url(
-            auth_type=_lambda.FunctionUrlAuthType.AWS_IAM,
+            auth_type=_lambda.FunctionUrlAuthType.NONE,
         )
 
         CfnOutput(self, "ApiUrl", value=api_url.url)

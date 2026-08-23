@@ -3,6 +3,7 @@ from aws_cdk import (
     Duration,
     Stack,
     CfnOutput,
+    ArnFormat,
     aws_lambda as _lambda,
     aws_secretsmanager as secretsmanager,
     aws_stepfunctions as sfn,
@@ -99,6 +100,8 @@ class AwsItAgenticAssistantStack(Stack):
                 file="lambda/data_seeder/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
+            memory_size=1024,
+            timeout=Duration.minutes(5),
             environment={
                 "DB_HOST": db_instance.instance_endpoint.hostname,
                 "DB_NAME": "agentdb",
@@ -117,6 +120,7 @@ class AwsItAgenticAssistantStack(Stack):
                 file="lambda/temp_query/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
+            timeout=Duration.seconds(30),
             environment={
                 "DB_HOST": db_instance.instance_endpoint.hostname,
                 "DB_NAME": "agentdb",
@@ -135,6 +139,8 @@ class AwsItAgenticAssistantStack(Stack):
                 file="lambda/intake_context/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
+            memory_size=1024,
+            timeout=Duration.seconds(30),
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[db_lambda_sg],
@@ -155,6 +161,8 @@ class AwsItAgenticAssistantStack(Stack):
                 file="lambda/upload_document/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
+            memory_size=1024,
+            timeout=Duration.seconds(60),
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[db_lambda_sg],
@@ -174,6 +182,8 @@ class AwsItAgenticAssistantStack(Stack):
                 file="lambda/ticketing/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
+            memory_size=1024,
+            timeout=Duration.seconds(60),
             environment={
                 "CLAUDE_API_KEY_SECRET_ARN": claude_secret.secret_arn,
                 "JIRA_TOKEN_SECRET_ARN": jira_secret.secret_arn,
@@ -188,6 +198,8 @@ class AwsItAgenticAssistantStack(Stack):
                 file="lambda/issue_resolution/Dockerfile"
             ),
             architecture=_lambda.Architecture.ARM_64,
+            memory_size=1024,
+            timeout=Duration.seconds(60),
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             security_groups=[db_lambda_sg],
@@ -221,6 +233,11 @@ class AwsItAgenticAssistantStack(Stack):
         intake_context_task = tasks.LambdaInvoke(
             self, "IntakeContextTask",
             lambda_function=intake_context_lambda,
+            payload=sfn.TaskInput.from_object({
+                "raw_input.$": "$.raw_input",
+                "user_id.$": "$.user_id",
+                "job_id.$": "$.job_id"
+            }),
             output_path="$.Payload"
         )
 
@@ -232,6 +249,7 @@ class AwsItAgenticAssistantStack(Stack):
             payload=sfn.TaskInput.from_object({
                 "action": "initialize",
                 "job_id.$": "$.job_id",
+                "user_id.$": "$.user_id",
                 "classification.$": "$.classification",
                 "raw_input.$": "$.raw_input",
                 "retrieved_chunks.$": "$.retrieved_chunks",
@@ -323,6 +341,14 @@ class AwsItAgenticAssistantStack(Stack):
         '''
         STEP FUNCTIONS: STATE MACHINE
         '''
+        state_machine_name = "ITAgenticAssistantWorkflow"
+        state_machine_arn = self.format_arn(
+            service="states",
+            resource="stateMachine",
+            resource_name=state_machine_name,
+            arn_format=ArnFormat.COLON_RESOURCE_NAME
+        )
+
         approval_choice = sfn.Choice(self, "ApprovalChoice")
         approval_choice.when(
             sfn.Condition.string_equals("$.approval_status", "approved"), 
@@ -355,6 +381,7 @@ class AwsItAgenticAssistantStack(Stack):
         state_machine_definition = intake_context_task.next(intake_choice)
         state_machine = sfn.StateMachine(
             self, "ITAgenticAssistantWorkflow",
+            state_machine_name=state_machine_name,
             definition_body=sfn.DefinitionBody.from_chainable(state_machine_definition),
             timeout=Duration.days(8) # Adding headroom on top of the 7-day task timeout for approval
         )
@@ -385,8 +412,13 @@ class AwsItAgenticAssistantStack(Stack):
                 resources=["*"]
             )
         )
-        state_machine.grant_start_execution(api_state_machine_lambda)
-        api_state_machine_lambda.add_environment("STATE_MACHINE_ARN", state_machine.state_machine_arn)
+        api_state_machine_lambda.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=["states:StartExecution"],
+                resources=[state_machine_arn]
+            )
+        )
+        api_state_machine_lambda.add_environment("STATE_MACHINE_ARN", state_machine_arn)
         ticketing_lambda.add_environment("APPROVAL_BASE_URL", api_url.url)
 
         db_instance.secret.grant_read(data_seeder_lambda)

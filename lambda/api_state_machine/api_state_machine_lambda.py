@@ -4,6 +4,7 @@ import json
 import uuid
 from fastapi import FastAPI, HTTPException
 from mangum import Mangum
+from common.status import get_status, update_status
 
 app = FastAPI()
 
@@ -18,7 +19,7 @@ def get_status(job_id: str):
 @app.post("/start-query")
 async def start_query(payload: dict):
     job_id = str(uuid.uuid4())
-    #TODO: Add "Update Status" to keep track of job status
+    update_status(job_id, "initializing", **payload)  # Store initial status in DynamoDB
 
     try:
         sfn.start_execution(
@@ -26,6 +27,7 @@ async def start_query(payload: dict):
             name=job_id,
             input=json.dumps({"job_id": job_id, **payload})
         )
+        update_status(job_id, "queued")
         return {"job_id": job_id, "status": "queued"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

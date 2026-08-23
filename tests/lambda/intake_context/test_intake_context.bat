@@ -1,0 +1,2 @@
+@REM INTAKE CONTEXT
+aws lambda invoke --function-name AwsItAgenticAssistantStac-IntakeContextLambda0DDE4-4Kpqnv2kBW6I --payload file://intake_context_event.json --cli-binary-format raw-in-base64-out out.json

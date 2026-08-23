@@ -1,0 +1,25 @@
+{
+  "version": "2.0",
+  "routeKey": "$default",
+  "rawPath": "/query-status",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/query-status",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "test-invoke"
+    },
+    "requestId": "test-request-id",
+    "routeKey": "$default",
+    "stage": "$default",
+    "time": "18/Aug/2026:00:00:00 +0000",
+    "timeEpoch": 0
+  },
+  "body": "{\"raw_input\": \"I can't login to my account.\", \"user_id\": \"U7001\"}",
+  "isBase64Encoded": false
+}

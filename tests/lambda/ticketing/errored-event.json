@@ -1,0 +1,10 @@
+{
+  "job_id": "c83cefef-bd85-415a-bfb2-3988fff45ea8",
+  "user_id": "U7001",
+  "statusCode": 200,
+  "classification": "password_reset",
+  "raw_input": "I can't login to my account.",
+  "retrieved_chunks": [],
+  "action": "initialize",
+  "body": "Hello from Intake Context Lambda!"
+}

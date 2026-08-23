@@ -10,7 +10,7 @@ import os
 from common.secrets import get_secret
 
 _CLAUDE_SECRET_ARN = os.environ["CLAUDE_API_KEY_SECRET_ARN"]
-client = Anthropic(api_key=get_secret(secret_arn=_CLAUDE_SECRET_ARN))
+client = Anthropic(api_key=get_secret(secret_arn=_CLAUDE_SECRET_ARN, secret_key="api_key"))
 
 class ActionClassification(BaseModel):
     action: str
@@ -23,7 +23,7 @@ def handler(event, context):
     print("Received event: " + str(event))
     # Process the event here
     job_id = event.get('job_id', 'unknown')
-    input_data = event.get('input', '')
+    input_data = event.get('raw_input', '')
     user_id = event.get('user_id', 'unknown')
     processed_input = process_input(input_data)
     response = IntakeContextResponse(

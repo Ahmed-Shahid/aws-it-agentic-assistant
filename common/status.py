@@ -8,7 +8,7 @@ so they all read/write the same job-status shape without duplicating logic.
 import os
 import time
 from typing import Optional
-from models import AgentState
+from common.models import AgentState
 
 import boto3
 
@@ -24,7 +24,7 @@ def update_status(job_id: str, status: str, **extra) -> None:
         return  # no-op if not configured, e.g. running a handler locally
     item = {"job_id": job_id, "status": status, "updated_at": int(time.time())}
     item.update(extra)
-    _table.put_item(Item=item)
+    _table.put_item(Item=item) #NOTE: Full overwrite, not merge, so task_token my be lost
 
 
 def get_status(job_id: str) -> Optional[dict]:
@@ -38,4 +38,5 @@ def write_state_to_status(state: AgentState) -> None:
     job_id = state.get("job_id")
     if not job_id:
         raise ValueError("Job ID is required to write state to status.")
-    update_status(job_id, "in_progress", **state)
+    extra = {k: v for k, v in state.items() if k != "job_id"}
+    update_status(job_id, "in_progress", **extra)

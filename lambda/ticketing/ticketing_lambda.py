@@ -34,6 +34,7 @@ def load_state_from_job_id(job_id: str) -> dict:
     # Placeholder for loading state from a job ID
     print(f"Loading state for job ID: {job_id}")
     status_record = get_status(job_id)
+    status_record = {k:v for k,v in status_record.items() if k != "updated_at"}  # Remove updated_at from the state
     return status_record
 
 def get_tools():
@@ -145,6 +146,7 @@ def request_approval(state: AgentState):
     print(f"Requesting approval for ticket with state: {state}")
     loaded_state = load_state_from_job_id(state.get("job_id", "unknown"))
     print(f"Loaded state from job ID: {loaded_state}")
+    token = state.get("token", None)
     jira = initialize_jira()
     jira.issue_add_comment(
         issue_key=loaded_state.get('ticket_id',''),
@@ -154,6 +156,7 @@ def request_approval(state: AgentState):
     )
     state.update(loaded_state)
     state["action"] = "waiting_for_approval"
+    state["token"] = token
     return state
 
 def mark_ticket_approved(state: AgentState):
@@ -169,7 +172,7 @@ def mark_ticket_approved(state: AgentState):
     )
     jira.issue_transition(
         issue_key=loaded_state.get('ticket_id',''),
-        status={"name": "In Progress"}
+        status="In Progress"
     )
     return state
 

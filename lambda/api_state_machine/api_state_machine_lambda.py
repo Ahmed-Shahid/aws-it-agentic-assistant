@@ -34,27 +34,27 @@ async def query_status(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
     return item
 
-@app.get("/approve-query/{job_id}")
+@app.get("/approve_query/{job_id}")
 async def approve(job_id: str):
     item = get_status(job_id)
     if not item:
         raise HTTPException(status_code=404, detail="Job not found")
     
     sfn.send_task_success(
-        taskToken=item["task_token"],
-        output=json.dumps({**item, "approval_status": "approved"})
+        taskToken=item["token"],
+        output=json.dumps({"job_id": job_id, "action": "approve"})
     )
     return {"job_id": job_id, "status": "approved"}
 
-@app.get("/reject-query/{job_id}")
+@app.get("/reject_query/{job_id}")
 async def reject(job_id: str):
     item = get_status(job_id)
     if not item:
         raise HTTPException(status_code=404, detail="Job not found")
     
     sfn.send_task_success(
-        taskToken=item["task_token"],
-        output=json.dumps({**item, "approval_status": "rejected"})
+        taskToken=item["token"],
+        output=json.dumps({"job_id": job_id, "action": "reject"})
         # error="QueryRejected",
         # cause="The query was rejected by the user."
     )

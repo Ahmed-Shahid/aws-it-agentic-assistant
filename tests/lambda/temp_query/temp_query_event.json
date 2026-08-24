@@ -1,3 +1,3 @@
 {
-    "sql": "select * from documents"
+    "sql": "select * from vpn_profiles where user_id = 'U7004';"
 }

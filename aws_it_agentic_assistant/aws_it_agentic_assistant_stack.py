@@ -296,7 +296,6 @@ class AwsItAgenticAssistantStack(Stack):
                 "token": sfn.JsonPath.task_token,
                 "job_id.$": "$.job_id"
             }),
-            output_path="$.Payload",
             task_timeout=sfn.Timeout.duration(Duration.days(7))
         )
 
@@ -353,11 +352,11 @@ class AwsItAgenticAssistantStack(Stack):
 
         approval_choice = sfn.Choice(self, "ApprovalChoice")
         approval_choice.when(
-            sfn.Condition.string_equals("$.approval_status", "approved"), 
+            sfn.Condition.string_equals("$.action", "approve"), 
             mark_approval_task.next(issue_resolution_postapr_task).next(close_ticket_task)
         )
         approval_choice.when(
-            sfn.Condition.string_equals("$.approval_status", "rejected"), 
+            sfn.Condition.string_equals("$.action", "reject"), 
             mark_rejection_task.next(close_ticket_task)
         )
 

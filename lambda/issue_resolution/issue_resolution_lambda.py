@@ -99,7 +99,10 @@ def route_to_workflow(state: AgentState):
     return state
 
 def workflow_router(state: AgentState) -> str:
-    return state.get("classification", "unknown")
+    classification = state.get("classification", "unknown")
+    if classification not in [x.value for x in Classifications]:
+        return Classifications.UNKNOWN.value
+    return classification
 
 def retrieve_status(state: AgentState):
     print(f"retrieve_status begin state: {state}")
@@ -183,7 +186,10 @@ def vpn_access_reset_workflow(state: AgentState):
 
 def unknown_workflow(state: AgentState):
     print(f"Executing unknown workflow for state: {state}")
-    return {}
+    audit_log = state.get("resolution_audit_log", [])
+    audit_log.append(get_audit_log_string("Unknown or action encountered. No resolution applied."))
+    audit_log.append(get_audit_log_string(f"classification: {state.get('classification')}, action: {state.get('action')}"))
+    return {"resolution_audit_log": audit_log}
 
 graph = StateGraph(AgentState)
 

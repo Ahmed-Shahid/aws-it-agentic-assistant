@@ -46,3 +46,4 @@ class AgentState(TypedDict, total=False):
     approved: Optional[bool]
     token: Optional[str]
     resolution_audit_log: Optional[list]
+    # updated_at: Optional[int]

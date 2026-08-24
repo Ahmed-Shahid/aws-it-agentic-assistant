@@ -162,8 +162,13 @@ with tab1:
         with st.spinner("Generating answer..."):
             result = start_query(payload)
 
-        st.subheader("Answer")
+        st.subheader("Result")
         st.write(result)
+
+        with st.spinner("Checking status..."):
+            status = get_status(result["job_id"])
+        st.subheader("Status")
+        st.write(status)
 
 with tab2:
     user_data = get_user_data()
@@ -185,9 +190,19 @@ with tab2:
 
 with tab3:
     statuses = get_all_statuses()
+    # statuses = [
+    #     {"job_id": "job1", "status": "queued"},
+    #     {"job_id": "job2", "status": "approved"},
+    #     {"job_id": "job3", "status": "rejected"},
+    # ]
     st.subheader("All Query Statuses")
     st.dataframe(statuses)
 
 with tab4:
     st.subheader("Evaluations")
     # Add evaluation content here
+    evaluations = [
+        {"Original Prompt": "If the classification is incorrect, propose a new classification.", 
+         "Issue": "Classification was changed even though there was an issue with the underlying data",
+         "New Prompt": "If no corrections are possible with the underlying data, propose a new classification."},
+    ]

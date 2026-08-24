@@ -4,7 +4,7 @@ import json
 import uuid
 from fastapi import FastAPI, HTTPException
 from mangum import Mangum
-from common.status import get_status, update_status
+from common.status import get_status, update_status, get_all_statuses
 
 app = FastAPI()
 
@@ -35,7 +35,7 @@ async def query_status(job_id: str):
     return item
 
 @app.get("/get-all-statuses")
-async def get_all_statuses():
+async def get_all_status_records():
     items = get_all_statuses()
     return items
 

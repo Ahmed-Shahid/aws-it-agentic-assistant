@@ -39,7 +39,8 @@ def get_system_prompt():
         "Everything you do absolutely must be grounded in retrieved corporate documentation (retrieved_chunks) and underlying corporate data for users, "
         "devices, IAM accounts, and VPN profiles. You must not hallucinate or make up any information. "
         "You will be provided with a classification, raw user input description of issue (raw_input), retrieved chunks, and underlying data. "
-        "Your task is to propose a numbered list of resolution steps to resolve the issue, and verify the input classification is correct. If the classification is incorrect, propose a new classification. "
+        "Your task is to propose a numbered list of resolution steps to resolve the issue, and verify the input classification is correct."
+        " If no corrections are possible with the underlying data, propose a new classification. "
         "Each step should be actionable and concise; less than 400 characters. If you cannot propose a resolution, respond with 'No resolution proposed'. "
     )
 

@@ -20,6 +20,6 @@
     "time": "18/Aug/2026:00:00:00 +0000",
     "timeEpoch": 0
   },
-  "body": "{\"raw_input\": \"I can connect to public internet, but internal corporate network is blocked for some reason.\", \"user_id\": \"U7001\"}",
+  "body": "{\"raw_input\": \"I can connect to public internet, but internal corporate network is blocked for some reason.\", \"user_id\": \"U7001\", \"top_k\": 3}",
   "isBase64Encoded": false
 }

@@ -34,6 +34,11 @@ async def query_status(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
     return item
 
+@app.get("/get-all-statuses")
+async def get_all_statuses():
+    items = get_all_statuses()
+    return items
+
 @app.get("/approve_query/{job_id}")
 async def approve(job_id: str):
     item = get_status(job_id)

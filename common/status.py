@@ -33,6 +33,13 @@ def get_status(job_id: str) -> Optional[dict]:
     resp = _table.get_item(Key={"job_id": job_id})
     return resp.get("Item")
 
+def get_all_statuses() -> list[dict]:
+    """Return all job statuses in the table."""
+    if _table is None:
+        return []
+    resp = _table.scan()
+    return resp.get("Items", [])
+
 def write_state_to_status(state: AgentState) -> None:
     """Write the current state to the status table for a given job_id."""
     job_id = state.get("job_id")

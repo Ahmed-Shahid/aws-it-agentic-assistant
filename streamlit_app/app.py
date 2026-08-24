@@ -2,13 +2,14 @@ import streamlit as st
 import boto3
 import json
 import requests
+import dotenv
+import subprocess
+
+dotenv.load_dotenv()
 
 st.set_page_config(page_title="IT Assistant Dashboard", layout="wide")
 
-lambda_client = boto3.client("lambda", region_name="us-west-1")  # match your region
-
-TEMP_QUERY_FN = "temp_query"
-API_FN_URL = "https://xxxx.lambda-url.us-west-1.on.aws/"  # api_state_machine's Function URL
+# lambda_client = boto3.client("lambda", region_name=REGION)  # match your region
 
 def call_temp_query(payload=None):
     resp = lambda_client.invoke(
@@ -21,62 +22,44 @@ def call_temp_query(payload=None):
         result = json.loads(result["body"])
     return result
 
+
+
 def call_api_state_machine(payload):
     r = requests.post(API_FN_URL, json=payload, timeout=15)
     r.raise_for_status()
     return r.json()
 
-st.title("Access Requests Dashboard")
+# st.title("Access Requests Dashboard")
 
-if st.button("Refresh data"):
-    st.cache_data.clear()
+# if st.button("Refresh data"):
+#     st.cache_data.clear()
 
-@st.cache_data(ttl=30)
-def load_data():
-    return call_temp_query()
+# @st.cache_data(ttl=30)
+# def load_data():
+#     return call_temp_query()
 
-data = load_data()
-st.dataframe(data)
+# data = load_data()
+# st.dataframe(data)
 
-st.divider()
-st.subheader("Trigger a new resolution")
-username = st.text_input("Username")
-system_name = st.text_input("System name")
+# st.divider()
+# st.subheader("Trigger a new resolution")
+# username = st.text_input("Username")
+# system_name = st.text_input("System name")
 
-if st.button("Submit issue"):
-    result = call_api_state_machine({
-        "username": username,
-        "system_name": system_name,
-    })
-    st.success("Submitted")
-    st.json(result)
+# if st.button("Submit issue"):
+#     result = call_api_state_machine({
+#         "username": username,
+#         "system_name": system_name,
+#     })
+#     st.success("Submitted")
+#     st.json(result)
 
-def retrieve(question, top_k=3):
-    results = collection.query(query_texts=[question], n_results=top_k)
-    docs = results.get("documents", [[]])[0]
-    metas = results.get("metadatas", [[]])[0]
-    rows = []
-    for d, m in zip(docs, metas):
-        rows.append({
-            "text": d,
-            "source": m.get("source_file", "unknown"),
-            "chunk_id": m.get("chunk_id", "na")
-        })
-    return rows
+st.set_page_config(page_title="IT Agentic Assistant", layout="wide")
+st.title("AWS IT Agentic Assistant")
 
-def generate_answer(prompt, model="phi3:mini", base_url="http://host.docker.internal:11434"):
-    payload = {"model": model, "prompt": prompt, "stream": False}
-    r = requests.post(f"{base_url}/api/generate", json=payload, timeout=120)
-    r.raise_for_status()
-    return r.json()["response"]
-
-st.set_page_config(page_title="Local RAG Assistant", layout="wide")
-st.title("Mini Project 2 - Local RAG Knowledge Assistant")
-
-question = st.text_input("Ask a question about the sample documents")
+question = st.text_input("Describe your issue:")
 top_k = st.slider("Top K", 1, 5, 3)
-model = st.text_input("Model", value="phi3:mini")
-base_url = st.text_input("Ollama URL", value="http://host.docker.internal:11434")
+user_id = st.selectbox("User ID", options=["user1", "user2", "user3"], index=0)
 
 if st.button("Ask") and question.strip():
     chunks = retrieve(question, top_k=top_k)

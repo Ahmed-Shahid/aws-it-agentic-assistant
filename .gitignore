@@ -24,3 +24,4 @@ cdk.out/
 sample_code/
 sample_data/
 out.json
+.env

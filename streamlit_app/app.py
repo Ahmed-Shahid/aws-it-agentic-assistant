@@ -5,6 +5,8 @@ import boto3
 import json
 import requests
 import dotenv
+import pypdf
+import docx
 
 dotenv.load_dotenv()
 TEMP_QUERY_FN = os.getenv("TEMP_QUERY_FN")
@@ -13,6 +15,7 @@ REGION = os.getenv("REGION")
 API_FN_URL = os.getenv("API_FN_URL")
 CA_BUNDLE_PATH = os.getenv("CA_BUNDLE_PATH")
 JIRA_BASE_URL = os.getenv("JIRA_BASE_URL")
+UPLOAD_DOCUMENT_FN = os.getenv("UPLOAD_DOCUMENT_FN")
 
 st.set_page_config(page_title="IT Assistant Dashboard", layout="wide")
 
@@ -70,8 +73,23 @@ def get_devices():
     }
     return call_temp_query(payload)
 
-def upload_document(file_content, file_name):
-    pass
+def upload_document(file_content, file_name, chunk_size=500):
+    """Invoke upload_document Lambda and normalize the response."""
+    resp = lambda_client.invoke(
+        FunctionName=UPLOAD_DOCUMENT_FN,
+        InvocationType="RequestResponse",
+        Payload=json.dumps({
+            "document_content": file_content,
+            "document_name": file_name,
+            "chunk_size": chunk_size
+        }),
+    )
+    result = json.loads(resp["Payload"].read())["result"]
+    # print(result)
+    # if isinstance(result, dict) and "body" in result:
+    #     body = result["body"]
+    #     result = json.loads(body) if isinstance(body, str) else body
+    return result
 
 def reset_database(type="db_sql"):
     payload = {
@@ -221,13 +239,38 @@ with tab4:
 with tab5:
     st.subheader("Upload Runbook Documentation")
     chunk_size = st.number_input("Chunk Size", min_value=100, max_value=10000, value=500, step=100)
-    uploaded_file = st.file_uploader("Choose a file")
+    uploaded_file = st.file_uploader("Choose a file", type=["txt", "md", "pdf", "docx"])
     if st.button("Upload") and uploaded_file is not None and chunk_size > 0:
-        # To read file as bytes:
-        bytes_data = uploaded_file.read()
+        file_extension = uploaded_file.name.split(".")[-1].lower()
+        bytes_data = ""
+    
+        if file_extension == "pdf":
+            st.write("Processing PDF...")
+            reader = pypdf.PdfReader(uploaded_file)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() + "\n"
+            bytes_data = text
+            
+        elif file_extension == "docx":
+            st.write("Processing DOCX...")
+            doc = docx.Document(uploaded_file)
+            text = ""
+            for paragraph in doc.paragraphs:
+                text += paragraph.text + "\n"
+            bytes_data = text
+        else:
+            bytes_data = uploaded_file.read()
+
         st.write("File uploaded successfully!")
         st.write(f"Filename: {uploaded_file.name}")
         st.write(f"File size: {len(bytes_data)} bytes")
         st.write(f"File type: {uploaded_file.type}")
         st.write(f"File content (first 100 bytes): {bytes_data[:100]}")
         st.write(uploaded_file.read())
+        # breakpoint()
+        upload_document(
+            file_content=str(bytes_data), 
+            file_name=uploaded_file.name, 
+            chunk_size=chunk_size
+        )

@@ -15,9 +15,11 @@ _MODEL_ID = "amazon.titan-embed-text-v2:0"
 
 
 def embed(text: str) -> list:
+    print(f"Generating embedding for text: {text}")
     response = _bedrock.invoke_model(
         modelId=_MODEL_ID,
         body=json.dumps({"inputText": text}),
     )
+    print(f"Bedrock response: {response}")
     payload = json.loads(response["body"].read())
     return payload["embedding"]

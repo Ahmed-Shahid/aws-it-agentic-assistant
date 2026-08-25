@@ -21,6 +21,8 @@ def handler(event, context):
         INSERT INTO document_chunks (chunk_id, document_id, document_name, chunk_content, embedding)
         VALUES ('{chunk_id}', '{document_id}', '{document_name}', '{chunk}', '{embedding}');
         """
+    print(f"Executing SQL: {sql}")
+    
     result = execute_query(sql)
     return {
         'statusCode': 200,

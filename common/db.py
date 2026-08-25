@@ -70,15 +70,15 @@ def similarity_search(embedding: list, top_k: int = 3, table: str = "document_ch
     """
     with get_cursor() as cur:
         cur.execute(
-            """
-            SELECT chunk_id, chunk_content, 1 - (embedding <=> %s) AS similarity
-            FROM %s
-            ORDER BY embedding <=> %s
+            f"""
+            SELECT chunk_id, chunk_content, 1 - (embedding::vector <=> %s::vector) AS similarity
+            FROM {table}
+            ORDER BY embedding::vector <=> %s::vector
             LIMIT %s
             """,
-            (embedding, table, embedding, top_k),
+            (embedding, embedding, top_k),
         )
-        return [{"chunk_id": r[0], "chunk_content": r[1], "similarity": r[2]} for r in cur.fetchall()]
+        return [{"chunk_id": r[0], "chunk_content": r[1], "similarity": str(r[2])} for r in cur.fetchall()]
 
 def execute_query(query: str, params: tuple = None) -> list:
     """Executes a SQL query and returns the results as a list of dictionaries."""

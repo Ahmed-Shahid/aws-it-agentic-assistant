@@ -19,7 +19,7 @@ class IntakeContextResponse(BaseModel):
     statusCode: int
     classification: str
     raw_input: str
-    retrieved_chunks: list[str]
+    retrieved_chunks: list[dict]
     action: str
     body: str = "Hello from Intake Context Lambda!"
 

@@ -42,7 +42,7 @@ def handler(event, context):
     return response.model_dump()
 
 def get_rag_chunks(input_data: str, top_k: int = 3):
-    retrieved_chunks = similarity_search(embed(input_data), top_k=top_k, table="document_chunks")
+    retrieved_chunks = similarity_search(embedding=embed(input_data), top_k=top_k, table="document_chunks")
     return retrieved_chunks or []
 
 def process_input(input_data: str, rag_chunks: list = []):

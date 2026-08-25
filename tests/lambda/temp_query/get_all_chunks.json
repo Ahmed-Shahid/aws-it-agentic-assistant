@@ -1,0 +1,3 @@
+{
+    "sql": "SELECT document_id, chunk_content, chunk_id FROM document_chunks;"
+}

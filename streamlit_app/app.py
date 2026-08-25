@@ -147,8 +147,8 @@ def get_status(job_id):
 
 # INITIALIZE DATA
 
-reset_database()
-reset_database(type="vector_sql")
+# reset_database()
+# reset_database(type="vector_sql")
 user_data = get_user_data()
 vpn_profiles = get_vpn_profiles()
 iam_accounts = get_iam_accounts()
@@ -169,7 +169,7 @@ user_id = st.sidebar.selectbox("User ID", options=[x["user_id"] for x in user_da
 # st.json(devices, expanded=False)
 
 # st.table(user_data)
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Issue Input", "Data Overview", "Jira Tickets", "Evaluations", "Upload Document"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Issue Input", "Data Overview", "Jira Tickets", "Evaluations", "Upload Document", "Test Cases"])
 
 with tab1:
     st.subheader("Describe your issue")
@@ -192,8 +192,17 @@ with tab1:
             status = get_status(result["job_id"])
         st.subheader("Status")
         st.write(status)
+        st.link_button("View Jira Board", "https://aiml-it-agentic-assistant.atlassian.net/jira/software/projects/KAN/boards/1?filter=&groupBy=none")
 
 with tab2:
+    if st.button("Refresh Data"):
+        st.rerun()
+
+    if st.button("Reset Database"):
+        reset_database()
+        st.success("Database reset successfully!")
+        st.rerun()
+
     user_data = get_user_data()
     vpn_profiles = get_vpn_profiles()
     iam_accounts = get_iam_accounts()
@@ -227,7 +236,7 @@ with tab3:
     st.dataframe(statuses)
 
 with tab4:
-    st.subheader("Evaluations")
+    st.subheader("Evaluation 1")
     # Add evaluation content here
     evaluations = [
         {"Original Prompt": "If the classification is incorrect, propose a new classification.", 
@@ -235,6 +244,17 @@ with tab4:
          "New Prompt": "If no corrections are possible with the underlying data, propose a new classification."},
     ]
     st.dataframe(evaluations)
+
+    st.subheader("Evaluation 2")
+    evaluations2 = [
+        {"Classification": "password_reset", 
+         "Chunk Size": "500",
+         "Similarity Score": "0.1682"},
+        {"Classification": "password_reset", 
+         "Chunk Size": "250",
+         "Similarity Score": "0.1682 (same chunks retrieved)"},
+
+    ]
 
 with tab5:
     st.subheader("Upload Runbook Documentation")
@@ -274,3 +294,9 @@ with tab5:
             file_name=uploaded_file.name, 
             chunk_size=chunk_size
         )
+
+with tab6:
+    st.subheader("VPN Access Reset Success")
+    st.subheader("VPN Access Reset Not Needed (Jira/State Machine Side By Side)")
+    st.subheader("Password Reset Retrieved Chunks")
+    st.subheader("Rejection")

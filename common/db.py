@@ -56,13 +56,13 @@ def get_cursor():
             yield cur
 
 
-def similarity_search(embedding: list, top_k: int = 5, table: str = "documents") -> list:
+def similarity_search(embedding: list, top_k: int = 3, table: str = "document_chunks") -> list:
     """Returns the top_k rows from `table` most similar to `embedding`,
     using pgvector's cosine-distance operator (<=>).
 
     Assumes a schema roughly like:
-        id          serial primary key,
-        content     text,
+        chunk_id    serial primary key,
+        chunk_content     text,
         embedding   vector(1024)
 
     `table` is a fixed, code-controlled default -- never pass a
@@ -70,15 +70,15 @@ def similarity_search(embedding: list, top_k: int = 5, table: str = "documents")
     """
     with get_cursor() as cur:
         cur.execute(
-            f"""
-            SELECT id, content, 1 - (embedding <=> %s) AS similarity
-            FROM {table}
+            """
+            SELECT chunk_id, chunk_content, 1 - (embedding <=> %s) AS similarity
+            FROM %s
             ORDER BY embedding <=> %s
             LIMIT %s
             """,
-            (embedding, embedding, top_k),
+            (embedding, table, embedding, top_k),
         )
-        return [{"id": r[0], "content": r[1], "similarity": r[2]} for r in cur.fetchall()]
+        return [{"chunk_id": r[0], "chunk_content": r[1], "similarity": r[2]} for r in cur.fetchall()]
 
 def execute_query(query: str, params: tuple = None) -> list:
     """Executes a SQL query and returns the results as a list of dictionaries."""

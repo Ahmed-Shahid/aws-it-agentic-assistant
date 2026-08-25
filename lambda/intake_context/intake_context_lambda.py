@@ -2,6 +2,8 @@ import json
 
 import boto3
 
+from common.db import similarity_search
+from common.embeddings import embed
 from common.models import IntakeContextResponse, ClaudeAIModels, Classifications
 from pydantic import BaseModel
 from anthropic import Anthropic
@@ -25,7 +27,9 @@ def handler(event, context):
     job_id = event.get('job_id', 'unknown')
     input_data = event.get('raw_input', '')
     user_id = event.get('user_id', 'unknown')
-    processed_input = process_input(input_data)
+    top_k = event.get('top_k', 3)
+    rag_chunks = get_rag_chunks(input_data, top_k=top_k)
+    processed_input = process_input(input_data, rag_chunks)
     response = IntakeContextResponse(
         job_id=job_id,
         user_id=user_id,
@@ -33,15 +37,15 @@ def handler(event, context):
         action=processed_input.get('action', 'initialize'),
         classification=processed_input.get('classification', 'unknown'),
         raw_input=input_data,
-        retrieved_chunks=processed_input.get('retrieved_chunks', [])
+        retrieved_chunks=rag_chunks
     )
     return response.model_dump()
 
-def get_rag_chunks(input_data: str):
-    # Placeholder for the function to get RAG chunks
-    return ""
+def get_rag_chunks(input_data: str, top_k: int = 3):
+    retrieved_chunks = similarity_search(embed(input_data), top_k=top_k, table="document_chunks")
+    return retrieved_chunks or []
 
-def process_input(input_data: str):
+def process_input(input_data: str, rag_chunks: list = []):
     response = client.messages.create(
         model = ClaudeAIModels.medium,
         max_tokens = 1000,
@@ -52,7 +56,7 @@ def process_input(input_data: str):
             {
                 "role": "user",
                 "content": (f"Input: {input_data}"
-                            f"Retrieved Chunks: {get_rag_chunks(input_data)}")
+                            f"Retrieved Chunks: {str(rag_chunks)}")
             }
         ]
     )

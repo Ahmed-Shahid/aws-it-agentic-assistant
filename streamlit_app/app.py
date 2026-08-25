@@ -12,6 +12,7 @@ DATA_SEEDER_FN = os.getenv("DATA_SEEDER_FN")
 REGION = os.getenv("REGION")
 API_FN_URL = os.getenv("API_FN_URL")
 CA_BUNDLE_PATH = os.getenv("CA_BUNDLE_PATH")
+JIRA_BASE_URL = os.getenv("JIRA_BASE_URL")
 
 st.set_page_config(page_title="IT Assistant Dashboard", layout="wide")
 
@@ -69,9 +70,12 @@ def get_devices():
     }
     return call_temp_query(payload)
 
-def reset_database():
+def upload_document(file_content, file_name):
+    pass
+
+def reset_database(type="db_sql"):
     payload = {
-    "sql": "db_sql"
+    "sql": type
     }
     resp = lambda_client.invoke(
             FunctionName=DATA_SEEDER_FN,
@@ -126,6 +130,7 @@ def get_status(job_id):
 # INITIALIZE DATA
 
 reset_database()
+reset_database(type="vector_sql")
 user_data = get_user_data()
 vpn_profiles = get_vpn_profiles()
 iam_accounts = get_iam_accounts()
@@ -146,7 +151,7 @@ user_id = st.sidebar.selectbox("User ID", options=[x["user_id"] for x in user_da
 # st.json(devices, expanded=False)
 
 # st.table(user_data)
-tab1, tab2, tab3, tab4 = st.tabs(["Issue Input", "Data Overview", "Jira Tickets", "Evaluations"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Issue Input", "Data Overview", "Jira Tickets", "Evaluations", "Upload Document"])
 
 with tab1:
     st.subheader("Describe your issue")
@@ -190,12 +195,17 @@ with tab2:
 
 with tab3:
     statuses = get_all_statuses()
+    statuses = [{k: v for k, v in item.items() if k in ("ticket_id", "title", "user_id", "status", "job_id")} for item in statuses]
+    for i, x in enumerate(statuses):
+        statuses[i]["ticket_url"] = f"{JIRA_BASE_URL}/browse/{x['ticket_id']}" if x.get("ticket_id") else ""
+
+    # statuses = [{k: v} for k, v in statuses.items() if k in ("ticket_id", "status", "job_id")]
     # statuses = [
     #     {"job_id": "job1", "status": "queued"},
     #     {"job_id": "job2", "status": "approved"},
     #     {"job_id": "job3", "status": "rejected"},
     # ]
-    st.subheader("All Query Statuses")
+    st.subheader("My Jira Tickets")
     st.dataframe(statuses)
 
 with tab4:
@@ -206,3 +216,18 @@ with tab4:
          "Issue": "Classification was changed even though there was an issue with the underlying data",
          "New Prompt": "If no corrections are possible with the underlying data, propose a new classification."},
     ]
+    st.dataframe(evaluations)
+
+with tab5:
+    st.subheader("Upload Runbook Documentation")
+    chunk_size = st.number_input("Chunk Size", min_value=100, max_value=10000, value=500, step=100)
+    uploaded_file = st.file_uploader("Choose a file")
+    if st.button("Upload") and uploaded_file is not None and chunk_size > 0:
+        # To read file as bytes:
+        bytes_data = uploaded_file.read()
+        st.write("File uploaded successfully!")
+        st.write(f"Filename: {uploaded_file.name}")
+        st.write(f"File size: {len(bytes_data)} bytes")
+        st.write(f"File type: {uploaded_file.type}")
+        st.write(f"File content (first 100 bytes): {bytes_data[:100]}")
+        st.write(uploaded_file.read())

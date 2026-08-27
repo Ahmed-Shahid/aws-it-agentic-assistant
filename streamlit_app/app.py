@@ -210,15 +210,21 @@ with tab4:
     st.dataframe(evaluations)
 
     st.subheader("Evaluation 2")
-    evaluations2 = [
-        {"Classification": "password_reset", 
-         "Chunk Size": "500",
-         "Similarity Score": "0.1682"},
-        {"Classification": "password_reset", 
-         "Chunk Size": "250",
-         "Similarity Score": "0.1682 (same chunks retrieved)"},
+    st.write("Hardcoded classifcations are 'vpn_access_reset', 'password_reset', 'iam_account_unlock'.")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.subheader("Original Prompt")
+        st.write(" If no corrections are possible with the underlying data, propose a new classification. ")
 
-    ]
+    with col2:
+        st.subheader("Unintended Classifications")
+        st.write("1. vpn_tunneling_issue")
+        st.write("2. device_compliance_issue")
+        st.write("3. network_connectivity_issue")
+
+    with col3:
+        st.subheader("Guardrails")
+        st.write(" Deterministic steps handle 'unknown' action, regardless of classification. ")
 
 with tab5:
     st.subheader("Upload Runbook Documentation")
